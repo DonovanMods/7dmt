@@ -1,9 +1,20 @@
-use super::super::cli::Vers;
-use std::path::PathBuf;
+use std::path::Path;
 
-pub fn run(paths: &Vec<PathBuf>, vers: &Vers) -> Result<(), String> {
-    println!("Bumping version to {:?}", vers);
-    println!("Bumping modlet(s) at {:?}", paths);
+#[derive(Debug)]
+pub enum BumpOptions {
+    Major,
+    Minor,
+    Patch,
+    Set(String),
+}
 
-    Ok(())
+pub fn run(modlet: &Path, opts: &Vec<BumpOptions>) -> Result<String, String> {
+    dbg!(opts);
+
+    Ok(format!(
+        "Bumped version of {} from {} to {}",
+        modlet.display(),
+        "old_ver",
+        "new_ver"
+    ))
 }

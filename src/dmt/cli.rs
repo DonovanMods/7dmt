@@ -1,3 +1,4 @@
+use super::super::CommandResult;
 use super::commands::*;
 use clap::{Args, Parser, Subcommand};
 use std::fmt;
@@ -66,51 +67,60 @@ pub struct Vers {
     patch: bool,
 }
 
-impl Cli {
-    pub fn verbose(&self) -> u8 {
-        self.verbose
-    }
-
-    pub fn command_name(&self) -> String {
-        format!("{}", &self.command)
-    }
-}
-
 #[derive(Debug)]
 pub enum CliError {
     NoModletPath,
     Unknown(String),
 }
 
-pub fn run() -> Result<Cli, Vec<CliError>> {
+pub fn run() -> CommandResult {
     let cli = Cli::parse();
-    let mut errors: Vec<CliError> = Vec::new();
+    let mut result = CommandResult {
+        verbose: cli.verbose,
+        ..Default::default()
+    };
 
     match &cli.command {
         Commands::Bump { paths, vers } => {
             if paths.is_empty() {
-                errors.push(CliError::NoModletPath);
-            }
+                result.errors.push(CliError::NoModletPath);
+            } else {
+                let mut opts: Vec<bump::BumpOptions> = Vec::new();
 
-            match bump::run(paths, vers) {
-                Ok(_) => (),
-                Err(err) => errors.push(CliError::Unknown(err)),
+                if let Some(ver) = &vers.ver {
+                    opts.push(bump::BumpOptions::Set(ver.clone()));
+                } else {
+                    if vers.major {
+                        opts.push(bump::BumpOptions::Major);
+                    }
+                    if vers.minor {
+                        opts.push(bump::BumpOptions::Minor);
+                    }
+                    if vers.patch {
+                        opts.push(bump::BumpOptions::Patch);
+                    }
+                }
+
+                for path in paths {
+                    match bump::run(path, &opts) {
+                        Ok(msg) => result.messages.push(msg),
+                        Err(err) => result.errors.push(CliError::Unknown(err)),
+                    }
+                }
             }
         }
         Commands::Init { name } => {
             if name.is_empty() {
-                errors.push(CliError::Unknown(String::from("No modlet name specified")));
+                result
+                    .errors
+                    .push(CliError::Unknown(String::from("No modlet name specified")));
             }
 
             println!("Initializing modlet {}", name);
         }
     };
 
-    if errors.len() > 0 {
-        Err(errors)
-    } else {
-        Ok(cli)
-    }
+    result
 }
 
 mod tests {

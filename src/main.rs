@@ -2,25 +2,32 @@ mod dmt;
 use dmt::cli;
 use std::process::exit;
 
+#[derive(Default, Debug)]
+pub struct CommandResult {
+    errors: Vec<cli::CliError>,
+    messages: Vec<String>,
+    verbose: u8,
+}
+
 fn main() {
     let result = cli::run();
 
     dbg!(&result);
-    match result {
-        Ok(cli) => {
-            if cli.verbose() >= 1 {
-                println!("{} completed successfully", cli.command_name());
+
+    if result.errors.is_empty() {
+        if result.verbose >= 1 {
+            for message in result.messages {
+                println!("{}", message);
             }
-            exit(0)
         }
-        Err(errors) => {
-            for error in errors {
-                match error {
-                    cli::CliError::NoModletPath => println!("No modlet path specified"),
-                    cli::CliError::Unknown(msg) => println!("Unknown error: {}", msg),
-                }
+        exit(0)
+    } else {
+        for error in result.errors {
+            match error {
+                cli::CliError::NoModletPath => eprintln!("No modlet path specified"),
+                cli::CliError::Unknown(msg) => eprintln!("Unknown error: {}", msg),
             }
-            exit(1)
         }
+        exit(1)
     }
 }
