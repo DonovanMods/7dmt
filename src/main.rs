@@ -8,8 +8,8 @@ fn main() {
     dbg!(&result);
     match result {
         Ok(cli) => {
-            if cli.verbose() >= 3 {
-                println!("Success");
+            if cli.verbose() >= 1 {
+                println!("{} completed successfully", cli.command_name());
             }
             exit(0)
         }

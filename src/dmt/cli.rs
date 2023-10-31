@@ -1,5 +1,6 @@
 use super::commands::*;
 use clap::{Args, Parser, Subcommand};
+use std::fmt;
 use std::path::PathBuf;
 
 #[derive(Debug, Parser)]
@@ -18,7 +19,7 @@ pub struct Cli {
 }
 
 #[derive(Subcommand, Debug)]
-enum Commands {
+pub enum Commands {
     #[command(arg_required_else_help = true)]
     /// Bump the version of a modlet
     Bump {
@@ -34,6 +35,15 @@ enum Commands {
         /// The name of the modlet to create
         name: String,
     },
+}
+
+impl fmt::Display for Commands {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Commands::Bump { .. } => write!(f, "Bump"),
+            Commands::Init { .. } => write!(f, "Init"),
+        }
+    }
 }
 
 #[derive(Args, Debug)]
@@ -60,6 +70,10 @@ impl Cli {
     pub fn verbose(&self) -> u8 {
         self.verbose
     }
+
+    pub fn command_name(&self) -> String {
+        format!("{}", &self.command)
+    }
 }
 
 #[derive(Debug)]
@@ -78,7 +92,10 @@ pub fn run() -> Result<Cli, Vec<CliError>> {
                 errors.push(CliError::NoModletPath);
             }
 
-            bump::run(paths, vers);
+            match bump::run(paths, vers) {
+                Ok(_) => (),
+                Err(err) => errors.push(CliError::Unknown(err)),
+            }
         }
         Commands::Init { name } => {
             if name.is_empty() {
