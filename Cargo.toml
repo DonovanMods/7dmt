@@ -1,8 +1,12 @@
 [package]
 name = "dmt"
-version = "0.1.0"
+description = "A command line too for managing 7 Days to Die Modlet builds"
+repository = "https://github.com/DonovanMods/dmt"
+authors = ["Donovan C. Young"]
 edition = "2021"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+clap = { version = "4.4.7", features = ["derive", "env"] }
