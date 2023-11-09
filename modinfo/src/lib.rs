@@ -1,13 +1,13 @@
-use quick_xml::{
-    events::{attributes::Attributes, *},
-    reader::Reader,
-    writer::Writer,
-};
-use std::{collections::HashMap, error, fs, io::Cursor, path::Path};
+use convert_case::{Case, Casing};
+use quick_xml::{events::*, reader::Reader, writer::Writer};
+use std::{borrow::Cow, collections::HashMap, error, fs, io::Cursor, path::Path};
 
 // Tests Module
 #[cfg(test)]
 mod modinfo_from_string_tests;
+
+#[cfg(test)]
+mod modinfo_to_string_tests;
 
 trait FromString<'m> {
     fn from_string(xml: String) -> Modinfo<'m>;
@@ -175,7 +175,39 @@ impl<'m> ToString for Modinfo<'m> {
         writer
             .write_event(Event::Start(BytesStart::new(&root_str)))
             .unwrap();
+
         // inject the attributes here
+        for field in [
+            "name",
+            "display_name",
+            "version",
+            "description",
+            "author",
+            "website",
+        ] {
+            if !is_v2 && (field == "website" || field == "display_name") {
+                continue;
+            }
+
+            let field_name = field.to_owned().to_case(Case::Pascal);
+            let mut elem = BytesStart::new(field_name);
+            let hash = self.get(field);
+
+            elem.push_attribute(attributes::Attribute {
+                key: quick_xml::name::QName(b"value"),
+                value: Cow::from(hash["value"].as_bytes()),
+            });
+
+            if hash.contains_key("compat") {
+                elem.push_attribute(attributes::Attribute {
+                    key: quick_xml::name::QName(b"compat"),
+                    value: Cow::from(hash["compat"].as_bytes()),
+                });
+            };
+
+            writer.write_event(Event::Empty(elem)).unwrap();
+        }
+
         writer
             .write_event(Event::End(BytesEnd::new(&root_str)))
             .unwrap();
@@ -243,6 +275,52 @@ impl<'m> FromString<'m> for Modinfo<'m> {
 }
 
 impl Modinfo<'_> {
+    fn get(&self, field: &str) -> HashMap<String, String> {
+        let mut return_value = HashMap::new();
+        let value_key = String::from("value");
+
+        let attrib = match field {
+            "author" => &self.author,
+            "description" => &self.description,
+            "display_name" => &self.display_name,
+            "name" => &self.name,
+            "version" => &self.version,
+            "website" => &self.website,
+            _ => panic!("Invalid field"),
+        };
+
+        match attrib {
+            ModinfoValues::Author { value: Some(value) } => {
+                return_value.insert(value_key, value.to_owned())
+            }
+            ModinfoValues::Description { value: Some(value) } => {
+                return_value.insert(value_key, value.to_owned())
+            }
+            ModinfoValues::DisplayName { value: Some(value) } => {
+                return_value.insert(value_key, value.to_owned())
+            }
+            ModinfoValues::Name { value: Some(value) } => {
+                return_value.insert(value_key, value.to_owned())
+            }
+            ModinfoValues::Website { value: Some(value) } => {
+                return_value.insert(value_key, value.to_owned())
+            }
+            ModinfoValues::Version {
+                value: Some(value),
+                compat,
+            } => {
+                return_value.insert(value_key, value.to_owned());
+                match compat {
+                    Some(value) => return_value.insert(String::from("compat"), value.to_owned()),
+                    None => None,
+                }
+            }
+            _ => return_value.insert(value_key, String::new()),
+        };
+
+        return_value
+    }
+
     pub fn write(&self) -> Result<(), ModinfoError> {
         let filename = format!("{}.new", self.meta.path.display());
         fs::write(filename, self.to_string()).unwrap();
@@ -251,11 +329,11 @@ impl Modinfo<'_> {
     }
 }
 
-fn parse_attributes(input: Attributes) -> HashMap<String, String> {
+fn parse_attributes(input: attributes::Attributes) -> HashMap<String, String> {
     let mut attributes = HashMap::new();
 
     input.map(|a| a.unwrap()).for_each(|a| {
-        let key: String = String::from_utf8_lossy(a.key.as_ref()).into_owned();
+        let key: String = String::from_utf8_lossy(a.key.as_ref()).to_lowercase();
         let value = String::from_utf8(a.value.into_owned()).unwrap();
 
         attributes.insert(key, value);
