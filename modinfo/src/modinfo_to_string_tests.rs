@@ -4,7 +4,7 @@ fn xml_string_v1() -> String {
     r#"
           <ModInfo>
               <Name value="SomeInternalName" />
-              <Version value="1.0" compat="A99" />
+              <Version value="1.0.0" compat="A99" />
               <Description value="Mod to show format of ModInfo v1" />
               <Author value="Name" />
           </ModInfo>
@@ -16,7 +16,7 @@ fn xml_string_v1_no_compat() -> String {
     r#"
           <ModInfo>
               <Name value="SomeInternalName" />
-              <Version value="1.0" />
+              <Version value="1.0.0" />
               <Description value="Mod to show format of ModInfo v1" />
               <Author value="Name" />
           </ModInfo>
@@ -26,11 +26,11 @@ fn xml_string_v1_no_compat() -> String {
 
 fn xml_string_v2() -> String {
     r#"
-          <?xml version="1.0" encoding="utf-8"?>
+          <?xml version="1.0" encoding="UTF-8"?>
           <xml>
               <Name value="SomeInternalName" />
               <DisplayName value="Official Mod Name" />
-              <Version value="2.0" compat="A99" />
+              <Version value="2.0.0" compat="A99" />
               <Description value="Mod to show format of ModInfo v2" />
               <Author value="Name" />
               <Website value="HP" />
@@ -41,11 +41,11 @@ fn xml_string_v2() -> String {
 
 fn xml_string_v2_no_compat() -> String {
     r#"
-          <?xml version="1.0" encoding="utf-8"?>
+          <?xml version="1.0" encoding="UTF-8"?>
           <xml>
               <Name value="SomeInternalName" />
               <DisplayName value="Official Mod Name" />
-              <Version value="2.0" />
+              <Version value="2.0.0" />
               <Description value="Mod to show format of ModInfo v2" />
               <Author value="Name" />
               <Website value="HP" />
@@ -55,7 +55,7 @@ fn xml_string_v2_no_compat() -> String {
 }
 
 fn strip_ws(s: &str) -> String {
-    s.to_lowercase().split_whitespace().collect()
+    s.split_whitespace().collect()
 }
 
 #[test]

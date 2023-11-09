@@ -112,7 +112,7 @@ enum ModinfoValues {
         value: Option<String>,
     },
     Version {
-        value: Option<String>,
+        value: Option<semver::Version>,
         compat: Option<String>,
     },
     Website {
@@ -254,7 +254,7 @@ impl<'m> FromString<'m> for Modinfo<'m> {
                                 compat = Some(attributes["compat"].clone());
                             }
                             modinfo.version = ModinfoValues::Version {
-                                value: Some(value),
+                                value: Some(lenient_semver::parse(&value).unwrap()),
                                 compat,
                             }
                         }
@@ -309,7 +309,7 @@ impl Modinfo<'_> {
                 value: Some(value),
                 compat,
             } => {
-                return_value.insert(value_key, value.to_owned());
+                return_value.insert(value_key, value.to_string());
                 match compat {
                     Some(value) => return_value.insert(String::from("compat"), value.to_owned()),
                     None => None,
