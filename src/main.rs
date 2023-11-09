@@ -25,6 +25,7 @@ fn main() {
         for error in result.errors {
             match error {
                 cli::CliError::NoModletPath => eprintln!("No modlet path specified"),
+                cli::CliError::InvalidArg(msg) => eprintln!("Invalid argument: {}", msg),
                 cli::CliError::Unknown(msg) => eprintln!("Unknown error: {}", msg),
             }
         }
