@@ -1,22 +1,21 @@
 use convert_case::{Case, Casing};
 use quick_xml::{events::*, reader::Reader, writer::Writer};
-use std::{borrow::Cow, collections::HashMap, error, fs, io::Cursor, path::Path};
+use semver::Version;
+use std::{borrow::Cow, collections::HashMap, error, fmt, fs, io::Cursor, path::Path};
 
 // Tests Module
 #[cfg(test)]
-mod modinfo_from_string_tests;
-
-#[cfg(test)]
-mod modinfo_to_string_tests;
+mod tests;
 
 trait FromString<'m> {
     fn from_string(xml: String) -> Modinfo<'m>;
 }
 
 #[derive(Debug)]
-pub enum ModinfoError {
+pub enum ModinfoError<'m> {
     IoError(std::io::Error),
     XMLError(quick_xml::Error),
+    InvalidVersion(lenient_semver_parser::Error<'m>),
     FsNotFound,
     NoModinfo,
     NoModinfoAuthor,
@@ -30,12 +29,13 @@ pub enum ModinfoError {
     UnknownTag(String),
 }
 
-impl error::Error for ModinfoError {}
-impl std::fmt::Display for ModinfoError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<'m> error::Error for ModinfoError<'m> {}
+impl<'m> fmt::Display for ModinfoError<'m> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ModinfoError::IoError(err) => write!(f, "I/O error occurred: {}", err),
             ModinfoError::XMLError(err) => write!(f, "XML error occurred: {}", err),
+            ModinfoError::InvalidVersion(err) => write!(f, "Invalid version: {}", err),
             ModinfoError::FsNotFound => write!(f, "File not found"),
             ModinfoError::NoModinfo => write!(f, "No modinfo.xml found"),
             ModinfoError::NoModinfoAuthor => write!(f, "No Author found in modinfo.xml"),
@@ -56,14 +56,20 @@ impl std::fmt::Display for ModinfoError {
         }
     }
 }
-impl From<std::io::Error> for ModinfoError {
+impl<'m> From<std::io::Error> for ModinfoError<'m> {
     fn from(err: std::io::Error) -> Self {
         ModinfoError::IoError(err)
     }
 }
-impl From<quick_xml::Error> for ModinfoError {
+impl<'m> From<quick_xml::Error> for ModinfoError<'m> {
     fn from(err: quick_xml::Error) -> Self {
         ModinfoError::XMLError(err)
+    }
+}
+
+impl<'l> From<lenient_semver_parser::Error<'l>> for ModinfoError<'l> {
+    fn from(err: lenient_semver_parser::Error<'l>) -> Self {
+        ModinfoError::InvalidVersion(err)
     }
 }
 
@@ -97,61 +103,74 @@ enum ModinfoVersion {
     V2,
 }
 
-#[derive(Debug, PartialEq)]
-enum ModinfoValues {
-    Author {
-        value: Option<String>,
-    },
-    Description {
-        value: Option<String>,
-    },
-    DisplayName {
-        value: Option<String>,
-    },
-    Name {
-        value: Option<String>,
-    },
-    Version {
-        value: Option<semver::Version>,
-        compat: Option<String>,
-    },
-    Website {
-        value: Option<String>,
-    },
-}
-
 #[derive(Debug)]
 struct ModinfoMeta<'m> {
     version: ModinfoVersion,
     path: &'m Path,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct ModinfoValue {
+    value: Option<String>,
+}
+
+impl fmt::Display for ModinfoValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.value {
+            Some(ref value) => write!(f, "{}", value),
+            None => write!(f, ""),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct ModinfoVersionValue {
+    value: Version,
+    compat: Option<String>,
+}
+
+impl fmt::Display for ModinfoVersionValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let version = &self.value.to_string();
+        let compat = match &self.compat {
+            Some(ref value) => value.to_string(),
+            None => String::new(),
+        };
+
+        if compat.is_empty() {
+            write!(f, "{}", version)
+        } else {
+            write!(f, "{} ({})", version, compat)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Modinfo<'m> {
-    author: ModinfoValues,
-    description: ModinfoValues,
-    display_name: ModinfoValues,
-    name: ModinfoValues,
-    version: ModinfoValues,
-    website: ModinfoValues,
+    author: ModinfoValue,
+    description: ModinfoValue,
+    display_name: ModinfoValue,
+    name: ModinfoValue,
+    version: ModinfoVersionValue,
+    website: ModinfoValue,
     meta: ModinfoMeta<'m>,
 }
 
 impl<'m> Default for Modinfo<'m> {
     fn default() -> Self {
         Modinfo {
-            author: ModinfoValues::Author { value: None },
-            description: ModinfoValues::Description { value: None },
-            display_name: ModinfoValues::DisplayName { value: None },
-            name: ModinfoValues::Name { value: None },
-            version: ModinfoValues::Version {
-                value: None,
+            author: ModinfoValue { value: None },
+            description: ModinfoValue { value: None },
+            display_name: ModinfoValue { value: None },
+            name: ModinfoValue { value: None },
+            version: ModinfoVersionValue {
+                value: Version::new(0, 1, 0),
                 compat: None,
             },
-            website: ModinfoValues::Website { value: None },
+            website: ModinfoValue { value: None },
             meta: ModinfoMeta {
                 version: ModinfoVersion::V1,
-                path: Path::new(""),
+                path: &Path::new(""),
             },
         }
     }
@@ -191,17 +210,23 @@ impl<'m> ToString for Modinfo<'m> {
 
             let field_name = field.to_owned().to_case(Case::Pascal);
             let mut elem = BytesStart::new(field_name);
-            let hash = self.get(field);
+            let value = match field {
+                "version" => self.get_version().to_string(),
+                _ => match self.get_value_for(field) {
+                    Some(value) => value.to_string(),
+                    None => String::new(),
+                },
+            };
 
             elem.push_attribute(attributes::Attribute {
-                key: quick_xml::name::QName(b"value"),
-                value: Cow::from(hash["value"].as_bytes()),
+                key: quick_xml::name::QName(self.value_key().into_bytes().as_ref()),
+                value: Cow::from(value.clone().into_bytes()),
             });
 
-            if hash.contains_key("compat") {
+            if field == "version" && self.version.compat.is_some() {
                 elem.push_attribute(attributes::Attribute {
                     key: quick_xml::name::QName(b"compat"),
-                    value: Cow::from(hash["compat"].as_bytes()),
+                    value: Cow::from(self.version.compat.as_ref().unwrap().as_bytes()),
                 });
             };
 
@@ -239,28 +264,30 @@ impl<'m> FromString<'m> for Modinfo<'m> {
                     let value = attributes["value"].clone();
 
                     match e.name().as_ref() {
-                        b"Author" => modinfo.author = ModinfoValues::Author { value: Some(value) },
-                        b"Description" => {
-                            modinfo.description = ModinfoValues::Description { value: Some(value) }
-                        }
+                        b"Author" => modinfo.author = ModinfoValue { value: Some(value) },
+                        b"Description" => modinfo.description = ModinfoValue { value: Some(value) },
                         b"DisplayName" => {
-                            modinfo.display_name = ModinfoValues::DisplayName { value: Some(value) }
+                            modinfo.display_name = ModinfoValue { value: Some(value) }
                         }
-                        b"Name" => modinfo.name = ModinfoValues::Name { value: Some(value) },
+                        b"Name" => modinfo.name = ModinfoValue { value: Some(value) },
                         b"Version" => {
                             let mut compat = None;
 
                             if attributes.contains_key("compat") {
                                 compat = Some(attributes["compat"].clone());
                             }
-                            modinfo.version = ModinfoValues::Version {
-                                value: Some(lenient_semver::parse(&value).unwrap()),
+                            modinfo.version = ModinfoVersionValue {
+                                value: match lenient_semver::parse_into::<Version>(&value) {
+                                    Ok(result) => result.clone(),
+                                    Err(err) => lenient_semver::parse_into::<Version>(
+                                        format!("0.0.0+{}", err.to_string()).as_ref(),
+                                    )
+                                    .unwrap(),
+                                },
                                 compat,
                             }
                         }
-                        b"Website" => {
-                            modinfo.website = ModinfoValues::Website { value: Some(value) }
-                        }
+                        b"Website" => modinfo.website = ModinfoValue { value: Some(value) },
                         _ => (),
                     }
                 }
@@ -274,51 +301,9 @@ impl<'m> FromString<'m> for Modinfo<'m> {
     }
 }
 
-impl Modinfo<'_> {
-    fn get(&self, field: &str) -> HashMap<String, String> {
-        let mut return_value = HashMap::new();
-        let value_key = String::from("value");
-
-        let attrib = match field {
-            "author" => &self.author,
-            "description" => &self.description,
-            "display_name" => &self.display_name,
-            "name" => &self.name,
-            "version" => &self.version,
-            "website" => &self.website,
-            _ => panic!("Invalid field"),
-        };
-
-        match attrib {
-            ModinfoValues::Author { value: Some(value) } => {
-                return_value.insert(value_key, value.to_owned())
-            }
-            ModinfoValues::Description { value: Some(value) } => {
-                return_value.insert(value_key, value.to_owned())
-            }
-            ModinfoValues::DisplayName { value: Some(value) } => {
-                return_value.insert(value_key, value.to_owned())
-            }
-            ModinfoValues::Name { value: Some(value) } => {
-                return_value.insert(value_key, value.to_owned())
-            }
-            ModinfoValues::Website { value: Some(value) } => {
-                return_value.insert(value_key, value.to_owned())
-            }
-            ModinfoValues::Version {
-                value: Some(value),
-                compat,
-            } => {
-                return_value.insert(value_key, value.to_string());
-                match compat {
-                    Some(value) => return_value.insert(String::from("compat"), value.to_owned()),
-                    None => None,
-                }
-            }
-            _ => return_value.insert(value_key, String::new()),
-        };
-
-        return_value
+impl<'m> Modinfo<'m> {
+    fn value_key(&self) -> String {
+        String::from("value")
     }
 
     pub fn write(&self) -> Result<(), ModinfoError> {
@@ -326,6 +311,40 @@ impl Modinfo<'_> {
         fs::write(filename, self.to_string()).unwrap();
 
         Ok(())
+    }
+
+    pub fn get_version(&self) -> &Version {
+        &self.version.value
+    }
+
+    pub fn get_value_for(&self, field: &str) -> Option<&String> {
+        match field.to_lowercase().as_ref() {
+            "author" => self.author.value.as_ref(),
+            "description" => self.description.value.as_ref(),
+            "display_name" => self.display_name.value.as_ref(),
+            "name" => self.name.value.as_ref(),
+            "website" => self.website.value.as_ref(),
+            "compat" => self.version.compat.as_ref(),
+            _ => None,
+        }
+    }
+
+    pub fn set_version(&mut self, version: &'m str) -> Result<(), ModinfoError> {
+        self.version.value = match lenient_semver::parse_into::<Version>(version) {
+            Ok(result) => result,
+            Err(err) => return Err(ModinfoError::InvalidVersion(err)),
+        };
+
+        Ok(())
+    }
+
+    pub fn bump_major(&self) {
+        let version = self.get_version();
+
+        // self.version = ModinfoVersionValue {
+        //     value: version.bumped_major(),
+        //     ..self.version
+        // };
     }
 }
 

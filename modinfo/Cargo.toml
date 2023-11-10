@@ -7,6 +7,9 @@ edition = "2021"
 
 [dependencies]
 convert_case = "0.6.0"
-lenient_semver = { version = "0.4.2", features = ["version_semver"] }
+lenient_semver = { version = "0.4.2", features = ["version_lite"] }
+lenient_semver_parser = "0.4.2"
+lenient_semver_version_builder = "0.4.2"
+lenient_version = "0.4.2"
 quick-xml = { version = "0.31.0", features = ["serialize"] }
 semver = "1.0.20"

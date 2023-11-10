@@ -1,6 +1,4 @@
-use super::*;
-
-fn xml_string_v1() -> String {
+pub fn xml_string_v1() -> String {
     r#"
           <ModInfo>
               <Name value="SomeInternalName" />
@@ -12,7 +10,7 @@ fn xml_string_v1() -> String {
     .to_string()
 }
 
-fn xml_string_v1_no_compat() -> String {
+pub fn xml_string_v1_no_compat() -> String {
     r#"
           <ModInfo>
               <Name value="SomeInternalName" />
@@ -24,7 +22,7 @@ fn xml_string_v1_no_compat() -> String {
     .to_string()
 }
 
-fn xml_string_v2() -> String {
+pub fn xml_string_v2() -> String {
     r#"
           <?xml version="1.0" encoding="UTF-8"?>
           <xml>
@@ -39,7 +37,7 @@ fn xml_string_v2() -> String {
     .to_string()
 }
 
-fn xml_string_v2_no_compat() -> String {
+pub fn xml_string_v2_no_compat() -> String {
     r#"
           <?xml version="1.0" encoding="UTF-8"?>
           <xml>
@@ -52,40 +50,4 @@ fn xml_string_v2_no_compat() -> String {
           </xml>
       "#
     .to_string()
-}
-
-fn strip_ws(s: &str) -> String {
-    s.split_whitespace().collect()
-}
-
-#[test]
-fn to_string_v1_test() {
-    let xml = xml_string_v1();
-    let result = Modinfo::from_string(xml.clone()).to_string();
-
-    assert_eq!(strip_ws(&result), strip_ws(&xml));
-}
-
-#[test]
-fn to_string_v1_no_compat_test() {
-    let xml = xml_string_v1_no_compat();
-    let result = Modinfo::from_string(xml.clone()).to_string();
-
-    assert_eq!(strip_ws(&result), strip_ws(&xml));
-}
-
-#[test]
-fn to_string_v2_test() {
-    let xml = xml_string_v2();
-    let result = Modinfo::from_string(xml.clone()).to_string();
-
-    assert_eq!(strip_ws(&result), strip_ws(&xml));
-}
-
-#[test]
-fn to_string_v2_no_compat_test() {
-    let xml = xml_string_v2_no_compat();
-    let result = Modinfo::from_string(xml.clone()).to_string();
-
-    assert_eq!(strip_ws(&result), strip_ws(&xml));
 }
