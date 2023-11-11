@@ -1,9 +1,9 @@
-use crate::tests::fixtures;
-use crate::*;
+use super::*;
 
+#[test]
 fn from_string_v1_test() {
     let result = Modinfo::from_string(fixtures::xml_string_v1());
-    let version = lenient_semver::parse("1").unwrap();
+    let version = lenient_semver::parse("1.2.3").unwrap();
 
     assert_eq!(
         result.name,
@@ -14,7 +14,7 @@ fn from_string_v1_test() {
     assert_eq!(result.display_name, ModinfoValue { value: None });
     assert_eq!(
         result.version,
-        ModinfoVersionValue {
+        ModinfoValueVersion {
             value: version,
             compat: Some("A99".to_string()),
         }
@@ -37,7 +37,7 @@ fn from_string_v1_test() {
 #[test]
 fn from_string_v1_no_compat_test() {
     let result = Modinfo::from_string(fixtures::xml_string_v1_no_compat());
-    let version = lenient_semver::parse("1").unwrap();
+    let version = lenient_semver::parse("1.2.3").unwrap();
 
     assert_eq!(
         result.name,
@@ -48,7 +48,7 @@ fn from_string_v1_no_compat_test() {
     assert_eq!(result.display_name, ModinfoValue { value: None });
     assert_eq!(
         result.version,
-        ModinfoVersionValue {
+        ModinfoValueVersion {
             value: version,
             compat: None
         }
@@ -71,7 +71,7 @@ fn from_string_v1_no_compat_test() {
 #[test]
 fn from_string_v2_test() {
     let result = Modinfo::from_string(fixtures::xml_string_v2());
-    let version = lenient_semver::parse("2").unwrap();
+    let version = lenient_semver::parse("2.3.4").unwrap();
 
     assert_eq!(
         result.name,
@@ -87,7 +87,7 @@ fn from_string_v2_test() {
     );
     assert_eq!(
         result.version,
-        ModinfoVersionValue {
+        ModinfoValueVersion {
             value: version,
             compat: Some("A99".to_string())
         }
@@ -115,7 +115,7 @@ fn from_string_v2_test() {
 #[test]
 fn from_string_v2_no_compat_test() {
     let result = Modinfo::from_string(fixtures::xml_string_v2_no_compat());
-    let version = lenient_semver::parse("2").unwrap();
+    let version = lenient_semver::parse("2.3.4").unwrap();
 
     assert_eq!(
         result.name,
@@ -131,7 +131,7 @@ fn from_string_v2_no_compat_test() {
     );
     assert_eq!(
         result.version,
-        ModinfoVersionValue {
+        ModinfoValueVersion {
             value: version,
             compat: None
         }

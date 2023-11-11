@@ -3,11 +3,10 @@ use quick_xml::{events::*, reader::Reader, writer::Writer};
 use semver::Version;
 use std::{borrow::Cow, collections::HashMap, error, fmt, fs, io::Cursor, path::Path};
 
-// Tests Module
 #[cfg(test)]
 mod tests;
 
-trait FromString<'m> {
+pub trait FromString<'m> {
     fn from_string(xml: String) -> Modinfo<'m>;
 }
 
@@ -23,7 +22,7 @@ pub enum ModinfoError<'m> {
     NoModinfoDisplayName,
     NoModinfoName,
     NoModinfoVersion,
-    NoModinfoVersionValue,
+    NoModinfoValueVersion,
     NoModinfoVersionCompat,
     NoModinfoWebsite,
     UnknownTag(String),
@@ -45,7 +44,7 @@ impl<'m> fmt::Display for ModinfoError<'m> {
             }
             ModinfoError::NoModinfoName => write!(f, "No Name found in modinfo.xml"),
             ModinfoError::NoModinfoVersion => write!(f, "No Version found in modinfo.xml"),
-            ModinfoError::NoModinfoVersionValue => {
+            ModinfoError::NoModinfoValueVersion => {
                 write!(f, "No Version value found in modinfo.xml")
             }
             ModinfoError::NoModinfoVersionCompat => {
@@ -104,9 +103,18 @@ enum ModinfoVersion {
 }
 
 #[derive(Debug)]
-struct ModinfoMeta<'m> {
+struct ModinfoValueMeta<'m> {
     version: ModinfoVersion,
     path: &'m Path,
+}
+
+impl Default for ModinfoValueMeta<'_> {
+    fn default() -> Self {
+        ModinfoValueMeta {
+            version: ModinfoVersion::V1,
+            path: Path::new(""),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -123,13 +131,19 @@ impl fmt::Display for ModinfoValue {
     }
 }
 
+impl Default for ModinfoValue {
+    fn default() -> Self {
+        ModinfoValue { value: None }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
-struct ModinfoVersionValue {
+struct ModinfoValueVersion {
     value: Version,
     compat: Option<String>,
 }
 
-impl fmt::Display for ModinfoVersionValue {
+impl fmt::Display for ModinfoValueVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let version = &self.value.to_string();
         let compat = match &self.compat {
@@ -145,33 +159,36 @@ impl fmt::Display for ModinfoVersionValue {
     }
 }
 
+impl Default for ModinfoValueVersion {
+    fn default() -> Self {
+        ModinfoValueVersion {
+            value: Version::new(0, 1, 0),
+            compat: None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Modinfo<'m> {
     author: ModinfoValue,
     description: ModinfoValue,
     display_name: ModinfoValue,
     name: ModinfoValue,
-    version: ModinfoVersionValue,
+    version: ModinfoValueVersion,
     website: ModinfoValue,
-    meta: ModinfoMeta<'m>,
+    meta: ModinfoValueMeta<'m>,
 }
 
 impl<'m> Default for Modinfo<'m> {
     fn default() -> Self {
         Modinfo {
-            author: ModinfoValue { value: None },
-            description: ModinfoValue { value: None },
-            display_name: ModinfoValue { value: None },
-            name: ModinfoValue { value: None },
-            version: ModinfoVersionValue {
-                value: Version::new(0, 1, 0),
-                compat: None,
-            },
-            website: ModinfoValue { value: None },
-            meta: ModinfoMeta {
-                version: ModinfoVersion::V1,
-                path: &Path::new(""),
-            },
+            author: ModinfoValue::default(),
+            description: ModinfoValue::default(),
+            display_name: ModinfoValue::default(),
+            name: ModinfoValue::default(),
+            version: ModinfoValueVersion::default(),
+            website: ModinfoValue::default(),
+            meta: ModinfoValueMeta::default(),
         }
     }
 }
@@ -219,7 +236,7 @@ impl<'m> ToString for Modinfo<'m> {
             };
 
             elem.push_attribute(attributes::Attribute {
-                key: quick_xml::name::QName(self.value_key().into_bytes().as_ref()),
+                key: quick_xml::name::QName(b"value"),
                 value: Cow::from(value.clone().into_bytes()),
             });
 
@@ -276,11 +293,11 @@ impl<'m> FromString<'m> for Modinfo<'m> {
                             if attributes.contains_key("compat") {
                                 compat = Some(attributes["compat"].clone());
                             }
-                            modinfo.version = ModinfoVersionValue {
+                            modinfo.version = ModinfoValueVersion {
                                 value: match lenient_semver::parse_into::<Version>(&value) {
                                     Ok(result) => result.clone(),
                                     Err(err) => lenient_semver::parse_into::<Version>(
-                                        format!("0.0.0+{}", err.to_string()).as_ref(),
+                                        format!("0.0.0+{}", err).as_ref(),
                                     )
                                     .unwrap(),
                                 },
@@ -302,10 +319,6 @@ impl<'m> FromString<'m> for Modinfo<'m> {
 }
 
 impl<'m> Modinfo<'m> {
-    fn value_key(&self) -> String {
-        String::from("value")
-    }
-
     pub fn write(&self) -> Result<(), ModinfoError> {
         let filename = format!("{}.new", self.meta.path.display());
         fs::write(filename, self.to_string()).unwrap();
@@ -339,12 +352,10 @@ impl<'m> Modinfo<'m> {
     }
 
     pub fn bump_major(&self) {
-        let version = self.get_version();
+        todo!();
+        // let mut version = self.get_version();
 
-        // self.version = ModinfoVersionValue {
-        //     value: version.bumped_major(),
-        //     ..self.version
-        // };
+        // version.bump_major();
     }
 }
 

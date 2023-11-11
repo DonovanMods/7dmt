@@ -1,5 +1,4 @@
-use crate::tests::fixtures;
-use crate::*;
+use super::*;
 
 fn strip_ws(s: &str) -> String {
     s.split_whitespace().collect()
