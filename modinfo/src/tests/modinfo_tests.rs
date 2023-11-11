@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn get_value_for_test() {
-    let modinfo = Modinfo::from_string(fixtures::xml_string_v2());
+    let modinfo = Modinfo::from_str(&fixtures::xml_string_v2()).unwrap();
 
     assert_eq!(
         modinfo.get_value_for("name"),

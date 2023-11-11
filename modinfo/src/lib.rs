@@ -1,53 +1,20 @@
 use convert_case::{Case, Casing};
 use quick_xml::{events::*, reader::Reader, writer::Writer};
 use semver::{BuildMetadata, Prerelease, Version};
-use std::{borrow::Cow, collections::HashMap, error, fmt, fs, io::Cursor, path::Path};
+use std::{
+    borrow::Cow, collections::HashMap, error, fmt, fs, io::Cursor, path::Path, str::FromStr,
+};
 
+// Include Modules
+mod impls;
+pub use impls::*;
+
+mod version_tools;
+pub use version_tools::*;
+
+// Include tests
 #[cfg(test)]
 mod tests;
-
-pub trait FromString<'m> {
-    fn from_string(xml: String) -> Modinfo<'m>;
-}
-
-pub trait VersionTools {
-    fn bump_major(&mut self);
-    fn bump_minor(&mut self);
-    fn bump_patch(&mut self);
-    fn add_pre(&mut self, pre: &str);
-    fn add_build(&mut self, build: &str);
-}
-
-impl VersionTools for Version {
-    fn bump_major(&mut self) {
-        self.major += 1;
-        self.minor = 0;
-        self.patch = 0;
-        self.pre = Prerelease::EMPTY;
-        self.build = BuildMetadata::EMPTY;
-    }
-
-    fn bump_minor(&mut self) {
-        self.minor += 1;
-        self.patch = 0;
-        self.pre = Prerelease::EMPTY;
-        self.build = BuildMetadata::EMPTY;
-    }
-
-    fn bump_patch(&mut self) {
-        self.patch += 1;
-        self.pre = Prerelease::EMPTY;
-        self.build = BuildMetadata::EMPTY;
-    }
-
-    fn add_build(&mut self, build: &str) {
-        self.build = BuildMetadata::new(build).unwrap();
-    }
-
-    fn add_pre(&mut self, pre: &str) {
-        self.pre = Prerelease::new(pre).unwrap();
-    }
-}
 
 #[derive(Debug)]
 pub enum ModinfoError<'m> {
@@ -156,7 +123,7 @@ impl Default for ModinfoValueMeta<'_> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 struct ModinfoValue {
     value: Option<String>,
 }
@@ -167,12 +134,6 @@ impl fmt::Display for ModinfoValue {
             Some(ref value) => write!(f, "{}", value),
             None => write!(f, ""),
         }
-    }
-}
-
-impl Default for ModinfoValue {
-    fn default() -> Self {
-        ModinfoValue { value: None }
     }
 }
 
@@ -217,20 +178,6 @@ pub struct Modinfo<'m> {
     website: ModinfoValue,
     meta: ModinfoValueMeta<'m>,
 }
-
-// impl<'m> Default for Modinfo<'m> {
-//     fn default() -> Self {
-//         Modinfo {
-//             author: ModinfoValue::default(),
-//             description: ModinfoValue::default(),
-//             display_name: ModinfoValue::default(),
-//             name: ModinfoValue::default(),
-//             version: ModinfoValueVersion::default(),
-//             website: ModinfoValue::default(),
-//             meta: ModinfoValueMeta::default(),
-//         }
-//     }
-// }
 
 impl<'m> ToString for Modinfo<'m> {
     fn to_string(&self) -> String {
@@ -297,11 +244,13 @@ impl<'m> ToString for Modinfo<'m> {
     }
 }
 
-impl<'m> FromString<'m> for Modinfo<'m> {
-    fn from_string(xml: String) -> Self {
+impl FromStr for Modinfo<'_> {
+    type Err = ModinfoError<'static>;
+
+    fn from_str(xml: &str) -> Result<Self, Self::Err> {
         let mut modinfo = Modinfo::default();
         let mut buf: Vec<u8> = Vec::new();
-        let mut reader = Reader::from_str(&xml);
+        let mut reader = Reader::from_str(xml);
         reader.trim_text(true);
 
         loop {
@@ -353,65 +302,7 @@ impl<'m> FromString<'m> for Modinfo<'m> {
             buf.clear();
         }
 
-        modinfo
-    }
-}
-
-impl<'m> Modinfo<'m> {
-    pub fn new() -> Self {
-        Modinfo::default()
-    }
-
-    pub fn write(&self) -> Result<(), ModinfoError> {
-        let filename = format!("{}.new", self.meta.path.display());
-        fs::write(filename, self.to_string()).unwrap();
-
-        Ok(())
-    }
-
-    pub fn get_version(&self) -> &Version {
-        &self.version.value
-    }
-
-    pub fn get_value_for(&self, field: &str) -> Option<&String> {
-        match field.to_lowercase().as_ref() {
-            "author" => self.author.value.as_ref(),
-            "description" => self.description.value.as_ref(),
-            "display_name" => self.display_name.value.as_ref(),
-            "name" => self.name.value.as_ref(),
-            "website" => self.website.value.as_ref(),
-            "compat" => self.version.compat.as_ref(),
-            _ => None,
-        }
-    }
-
-    pub fn set_version(&mut self, version: &'m str) -> Result<(), ModinfoError> {
-        self.version.value = match lenient_semver::parse_into::<Version>(version) {
-            Ok(result) => result,
-            Err(err) => return Err(ModinfoError::InvalidVersion(err)),
-        };
-
-        Ok(())
-    }
-
-    pub fn bump_version_major(&mut self) {
-        self.version.value.bump_major();
-    }
-
-    pub fn bump_version_minor(&mut self) {
-        self.version.value.bump_minor();
-    }
-
-    pub fn bump_version_patch(&mut self) {
-        self.version.value.bump_patch();
-    }
-
-    pub fn add_version_pre(&mut self, pre: &'m str) {
-        self.version.value.add_pre(pre);
-    }
-
-    pub fn add_version_build(&mut self, build: &'m str) {
-        self.version.value.add_build(build);
+        Ok(modinfo)
     }
 }
 
@@ -429,14 +320,41 @@ fn parse_attributes(input: attributes::Attributes) -> HashMap<String, String> {
 }
 
 pub fn parse(file: &Path) -> Result<Modinfo, ModinfoError> {
-    let mut modinfo = match Path::try_exists(file) {
-        Ok(true) => Modinfo::from_string(fs::read_to_string(file)?),
+    let modinfo = match Path::try_exists(file) {
+        Ok(true) => Modinfo::from_str(fs::read_to_string(file)?.as_ref()),
         Ok(false) => return Err(ModinfoError::FsNotFound),
         Err(err) => return Err(ModinfoError::IoError(err)),
     };
 
-    // store the original file path in the metadata
-    modinfo.meta.path = file;
+    match modinfo {
+        Ok(mut modinfo) => {
+            if modinfo.author.value.is_none() {
+                return Err(ModinfoError::NoModinfoAuthor);
+            }
+            if modinfo.description.value.is_none() {
+                return Err(ModinfoError::NoModinfoDescription);
+            }
+            if modinfo.display_name.value.is_none() {
+                return Err(ModinfoError::NoModinfoDisplayName);
+            }
+            if modinfo.name.value.is_none() {
+                return Err(ModinfoError::NoModinfoName);
+            }
+            if modinfo.version.value.to_string().is_empty() {
+                return Err(ModinfoError::NoModinfoValueVersion);
+            }
+            if modinfo.version.compat.is_none() {
+                return Err(ModinfoError::NoModinfoVersionCompat);
+            }
+            if modinfo.website.value.is_none() {
+                return Err(ModinfoError::NoModinfoWebsite);
+            }
 
-    Ok(modinfo)
+            // store the original file path in the metadata
+            modinfo.meta.path = file;
+
+            Ok(modinfo)
+        }
+        Err(err) => Err(err),
+    }
 }

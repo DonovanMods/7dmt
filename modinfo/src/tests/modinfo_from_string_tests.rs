@@ -1,8 +1,8 @@
 use super::*;
 
 #[test]
-fn from_string_v1_test() {
-    let result = Modinfo::from_string(fixtures::xml_string_v1());
+fn from_str_v1_test() {
+    let result = Modinfo::from_str(&fixtures::xml_string_v1()).unwrap();
     let version = lenient_semver::parse("1.2.3").unwrap();
 
     assert_eq!(
@@ -35,8 +35,8 @@ fn from_string_v1_test() {
 }
 
 #[test]
-fn from_string_v1_no_compat_test() {
-    let result = Modinfo::from_string(fixtures::xml_string_v1_no_compat());
+fn from_str_v1_no_compat_test() {
+    let result = Modinfo::from_str(&fixtures::xml_string_v1_no_compat()).unwrap();
     let version = lenient_semver::parse("1.2.3").unwrap();
 
     assert_eq!(
@@ -69,8 +69,8 @@ fn from_string_v1_no_compat_test() {
 }
 
 #[test]
-fn from_string_v2_test() {
-    let result = Modinfo::from_string(fixtures::xml_string_v2());
+fn from_str_v2_test() {
+    let result = Modinfo::from_str(&fixtures::xml_string_v2()).unwrap();
     let version = lenient_semver::parse("2.3.4").unwrap();
 
     assert_eq!(
@@ -113,8 +113,8 @@ fn from_string_v2_test() {
 }
 
 #[test]
-fn from_string_v2_no_compat_test() {
-    let result = Modinfo::from_string(fixtures::xml_string_v2_no_compat());
+fn from_str_v2_no_compat_test() {
+    let result = Modinfo::from_str(&fixtures::xml_string_v2_no_compat()).unwrap();
     let version = lenient_semver::parse("2.3.4").unwrap();
 
     assert_eq!(

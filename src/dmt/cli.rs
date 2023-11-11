@@ -70,6 +70,7 @@ pub struct Vers {
 #[derive(Debug)]
 pub enum CliError {
     NoModletPath,
+    InvalidArg(String),
     Unknown(String),
 }
 
@@ -86,6 +87,8 @@ pub fn run() -> CommandResult {
                 result.errors.push(CliError::NoModletPath);
             } else {
                 let mut opts: Vec<bump::BumpOptions> = Vec::new();
+
+                opts.push(bump::BumpOptions::Verbosity(cli.verbose));
 
                 if let Some(ver) = &vers.ver {
                     opts.push(bump::BumpOptions::Set(ver.clone()));
@@ -104,7 +107,7 @@ pub fn run() -> CommandResult {
                 for path in paths {
                     match bump::run(path, &opts) {
                         Ok(msg) => result.messages.push(msg),
-                        Err(err) => result.errors.push(CliError::Unknown(err)),
+                        Err(err) => result.errors.push(CliError::InvalidArg(err)),
                     }
                 }
             }
