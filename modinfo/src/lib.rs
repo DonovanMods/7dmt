@@ -14,6 +14,8 @@ pub trait VersionTools {
     fn bump_major(&mut self);
     fn bump_minor(&mut self);
     fn bump_patch(&mut self);
+    fn add_pre(&mut self, pre: &str);
+    fn add_build(&mut self, build: &str);
 }
 
 impl VersionTools for Version {
@@ -36,6 +38,14 @@ impl VersionTools for Version {
         self.patch += 1;
         self.pre = Prerelease::EMPTY;
         self.build = BuildMetadata::EMPTY;
+    }
+
+    fn add_build(&mut self, build: &str) {
+        self.build = BuildMetadata::new(build).unwrap();
+    }
+
+    fn add_pre(&mut self, pre: &str) {
+        self.pre = Prerelease::new(pre).unwrap();
     }
 }
 
@@ -197,7 +207,7 @@ impl Default for ModinfoValueVersion {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Modinfo<'m> {
     author: ModinfoValue,
     description: ModinfoValue,
@@ -208,19 +218,19 @@ pub struct Modinfo<'m> {
     meta: ModinfoValueMeta<'m>,
 }
 
-impl<'m> Default for Modinfo<'m> {
-    fn default() -> Self {
-        Modinfo {
-            author: ModinfoValue::default(),
-            description: ModinfoValue::default(),
-            display_name: ModinfoValue::default(),
-            name: ModinfoValue::default(),
-            version: ModinfoValueVersion::default(),
-            website: ModinfoValue::default(),
-            meta: ModinfoValueMeta::default(),
-        }
-    }
-}
+// impl<'m> Default for Modinfo<'m> {
+//     fn default() -> Self {
+//         Modinfo {
+//             author: ModinfoValue::default(),
+//             description: ModinfoValue::default(),
+//             display_name: ModinfoValue::default(),
+//             name: ModinfoValue::default(),
+//             version: ModinfoValueVersion::default(),
+//             website: ModinfoValue::default(),
+//             meta: ModinfoValueMeta::default(),
+//         }
+//     }
+// }
 
 impl<'m> ToString for Modinfo<'m> {
     fn to_string(&self) -> String {
@@ -386,6 +396,22 @@ impl<'m> Modinfo<'m> {
 
     pub fn bump_version_major(&mut self) {
         self.version.value.bump_major();
+    }
+
+    pub fn bump_version_minor(&mut self) {
+        self.version.value.bump_minor();
+    }
+
+    pub fn bump_version_patch(&mut self) {
+        self.version.value.bump_patch();
+    }
+
+    pub fn add_version_pre(&mut self, pre: &'m str) {
+        self.version.value.add_pre(pre);
+    }
+
+    pub fn add_version_build(&mut self, build: &'m str) {
+        self.version.value.add_build(build);
     }
 }
 
