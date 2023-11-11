@@ -1,6 +1,6 @@
 use convert_case::{Case, Casing};
 use quick_xml::{events::*, reader::Reader, writer::Writer};
-use semver::Version;
+use semver::{BuildMetadata, Prerelease, Version};
 use std::{borrow::Cow, collections::HashMap, error, fmt, fs, io::Cursor, path::Path};
 
 #[cfg(test)]
@@ -8,6 +8,35 @@ mod tests;
 
 pub trait FromString<'m> {
     fn from_string(xml: String) -> Modinfo<'m>;
+}
+
+pub trait VersionTools {
+    fn bump_major(&mut self);
+    fn bump_minor(&mut self);
+    fn bump_patch(&mut self);
+}
+
+impl VersionTools for Version {
+    fn bump_major(&mut self) {
+        self.major += 1;
+        self.minor = 0;
+        self.patch = 0;
+        self.pre = Prerelease::EMPTY;
+        self.build = BuildMetadata::EMPTY;
+    }
+
+    fn bump_minor(&mut self) {
+        self.minor += 1;
+        self.patch = 0;
+        self.pre = Prerelease::EMPTY;
+        self.build = BuildMetadata::EMPTY;
+    }
+
+    fn bump_patch(&mut self) {
+        self.patch += 1;
+        self.pre = Prerelease::EMPTY;
+        self.build = BuildMetadata::EMPTY;
+    }
 }
 
 #[derive(Debug)]
@@ -319,6 +348,10 @@ impl<'m> FromString<'m> for Modinfo<'m> {
 }
 
 impl<'m> Modinfo<'m> {
+    pub fn new() -> Self {
+        Modinfo::default()
+    }
+
     pub fn write(&self) -> Result<(), ModinfoError> {
         let filename = format!("{}.new", self.meta.path.display());
         fs::write(filename, self.to_string()).unwrap();
@@ -351,11 +384,8 @@ impl<'m> Modinfo<'m> {
         Ok(())
     }
 
-    pub fn bump_major(&self) {
-        todo!();
-        // let mut version = self.get_version();
-
-        // version.bump_major();
+    pub fn bump_version_major(&mut self) {
+        self.version.value.bump_major();
     }
 }
 
