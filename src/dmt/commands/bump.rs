@@ -1,5 +1,5 @@
 use modinfo::ModinfoError;
-use std::path::Path;
+use std::path::PathBuf;
 
 #[derive(Debug)]
 pub enum BumpOptions {
@@ -10,11 +10,11 @@ pub enum BumpOptions {
     Verbosity(u8),
 }
 
-pub fn run(modlet: &Path, opts: &Vec<BumpOptions>) -> Result<String, String> {
+pub fn run(modlet: PathBuf, opts: &Vec<BumpOptions>) -> Result<String, String> {
     // dbg!(opts);
 
     let mut verbosity = 0;
-    let mut modinfo = match modinfo::parse(modlet) {
+    let mut modinfo = match modinfo::parse(modlet.clone()) {
         Ok(result) => result,
         Err(err) => {
             return match err {
@@ -46,7 +46,7 @@ pub fn run(modlet: &Path, opts: &Vec<BumpOptions>) -> Result<String, String> {
 
     // TODO: bump version here!
 
-    match &modinfo.write() {
+    match &modinfo.write(None) {
         Ok(_) => Ok(format!(
             "Bumped version of {} from {} to {}",
             modlet.display(),

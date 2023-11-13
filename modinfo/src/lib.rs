@@ -2,7 +2,12 @@ use convert_case::{Case, Casing};
 use quick_xml::{events::*, reader::Reader, writer::Writer};
 use semver::{BuildMetadata, Prerelease, Version};
 use std::{
-    borrow::Cow, collections::HashMap, error, fmt, fs, io::Cursor, path::Path, str::FromStr,
+    borrow::Cow,
+    collections::HashMap,
+    error, fmt, fs,
+    io::Cursor,
+    path::{Path, PathBuf},
+    str::FromStr,
 };
 
 // Include Modules
@@ -19,7 +24,6 @@ mod tests;
 #[derive(Debug)]
 pub enum ModinfoError<'m> {
     IoError(std::io::Error),
-    XMLError(quick_xml::Error),
     InvalidVersion(lenient_semver_parser::Error<'m>),
     FsNotFound,
     NoModinfo,
@@ -32,6 +36,8 @@ pub enum ModinfoError<'m> {
     NoModinfoVersionCompat,
     NoModinfoWebsite,
     UnknownTag(String),
+    WriteError,
+    XMLError(quick_xml::Error),
 }
 
 impl<'m> error::Error for ModinfoError<'m> {}
@@ -39,7 +45,6 @@ impl<'m> fmt::Display for ModinfoError<'m> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ModinfoError::IoError(err) => write!(f, "I/O error occurred: {}", err),
-            ModinfoError::XMLError(err) => write!(f, "XML error occurred: {}", err),
             ModinfoError::InvalidVersion(err) => write!(f, "Invalid version: {}", err),
             ModinfoError::FsNotFound => write!(f, "File not found"),
             ModinfoError::NoModinfo => write!(f, "No modinfo.xml found"),
@@ -58,6 +63,8 @@ impl<'m> fmt::Display for ModinfoError<'m> {
             }
             ModinfoError::NoModinfoWebsite => write!(f, "No Website found in modinfo.xml"),
             ModinfoError::UnknownTag(err) => write!(f, "{}", err),
+            ModinfoError::WriteError => write!(f, "Could not write modinfo.xml"),
+            ModinfoError::XMLError(err) => write!(f, "XML error occurred: {}", err),
         }
     }
 }
@@ -109,16 +116,16 @@ enum ModinfoVersion {
 }
 
 #[derive(Debug)]
-struct ModinfoValueMeta<'m> {
+struct ModinfoValueMeta {
     version: ModinfoVersion,
-    path: &'m Path,
+    path: PathBuf,
 }
 
-impl Default for ModinfoValueMeta<'_> {
+impl Default for ModinfoValueMeta {
     fn default() -> Self {
         ModinfoValueMeta {
             version: ModinfoVersion::V1,
-            path: Path::new(""),
+            path: PathBuf::new(),
         }
     }
 }
@@ -169,17 +176,17 @@ impl Default for ModinfoValueVersion {
 }
 
 #[derive(Debug, Default)]
-pub struct Modinfo<'m> {
+pub struct Modinfo {
     author: ModinfoValue,
     description: ModinfoValue,
     display_name: ModinfoValue,
     name: ModinfoValue,
     version: ModinfoValueVersion,
     website: ModinfoValue,
-    meta: ModinfoValueMeta<'m>,
+    meta: ModinfoValueMeta,
 }
 
-impl<'m> ToString for Modinfo<'m> {
+impl ToString for Modinfo {
     fn to_string(&self) -> String {
         let mut writer = Writer::new_with_indent(Cursor::new(Vec::new()), b' ', 2);
         let is_v2 = ModinfoVersion::V2 == self.meta.version;
@@ -244,7 +251,7 @@ impl<'m> ToString for Modinfo<'m> {
     }
 }
 
-impl FromStr for Modinfo<'_> {
+impl FromStr for Modinfo {
     type Err = ModinfoError<'static>;
 
     fn from_str(xml: &str) -> Result<Self, Self::Err> {
@@ -319,9 +326,9 @@ fn parse_attributes(input: attributes::Attributes) -> HashMap<String, String> {
     attributes
 }
 
-pub fn parse(file: &Path) -> Result<Modinfo, ModinfoError> {
-    let modinfo = match Path::try_exists(file) {
-        Ok(true) => Modinfo::from_str(fs::read_to_string(file)?.as_ref()),
+pub fn parse<'m>(file: PathBuf) -> Result<Modinfo, ModinfoError<'m>> {
+    let modinfo = match Path::try_exists(&file) {
+        Ok(true) => Modinfo::from_str(fs::read_to_string(&file)?.as_ref()),
         Ok(false) => return Err(ModinfoError::FsNotFound),
         Err(err) => return Err(ModinfoError::IoError(err)),
     };

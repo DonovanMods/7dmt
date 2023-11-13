@@ -1,12 +1,19 @@
 use super::*;
 
-impl<'m> Modinfo<'m> {
+impl Modinfo {
     pub fn new() -> Self {
         Modinfo::default()
     }
 
-    pub fn write(&self) -> Result<(), ModinfoError> {
-        fs::write(self.meta.path, self.to_string())?;
+    pub fn write(&self, file: Option<&Path>) -> Result<(), ModinfoError> {
+        match file {
+            Some(path) => {
+                fs::write(path, self.to_string())?;
+            }
+            None => {
+                fs::write(self.meta.path.clone(), self.to_string())?;
+            }
+        }
 
         Ok(())
     }
@@ -27,14 +34,18 @@ impl<'m> Modinfo<'m> {
         }
     }
 
-    pub fn set_version(&mut self, version: &'m str) {
+    pub fn set_version(&mut self, version: &str) {
         self.version.value.set_version(version)
-        // self.version.value = match lenient_semver::parse_into::<Version>(version) {
-        //     Ok(result) => result,
-        //     Err(err) => return Err(ModinfoError::InvalidVersion(err)),
-        // };
+    }
 
-        // Ok(())
+    pub fn set_name(&mut self, name: &str) {
+        self.name = ModinfoValue {
+            value: Some(name.to_owned()),
+        }
+    }
+
+    pub fn set_file_path(&mut self, path: PathBuf) {
+        self.meta.path = path.clone();
     }
 
     pub fn bump_version_major(&mut self) {
@@ -49,11 +60,11 @@ impl<'m> Modinfo<'m> {
         self.version.value.bump_patch()
     }
 
-    pub fn add_version_pre(&mut self, pre: &'m str) {
+    pub fn add_version_pre(&mut self, pre: &str) {
         self.version.value.add_pre(pre)
     }
 
-    pub fn add_version_build(&mut self, build: &'m str) {
+    pub fn add_version_build(&mut self, build: &str) {
         self.version.value.add_build(build)
     }
 }

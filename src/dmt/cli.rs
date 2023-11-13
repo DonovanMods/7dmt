@@ -1,5 +1,5 @@
 use super::super::CommandResult;
-use super::commands::*;
+use super::commands;
 use clap::{Args, Parser, Subcommand};
 use std::fmt;
 use std::path::PathBuf;
@@ -86,26 +86,26 @@ pub fn run() -> CommandResult {
             if paths.is_empty() {
                 result.errors.push(CliError::NoModletPath);
             } else {
-                let mut opts: Vec<bump::BumpOptions> = Vec::new();
+                let mut opts: Vec<commands::bump::BumpOptions> = Vec::new();
 
-                opts.push(bump::BumpOptions::Verbosity(cli.verbose));
+                opts.push(commands::bump::BumpOptions::Verbosity(cli.verbose));
 
                 if let Some(ver) = &vers.ver {
-                    opts.push(bump::BumpOptions::Set(ver.clone()));
+                    opts.push(commands::bump::BumpOptions::Set(ver.clone()));
                 } else {
                     if vers.major {
-                        opts.push(bump::BumpOptions::Major);
+                        opts.push(commands::bump::BumpOptions::Major);
                     }
                     if vers.minor {
-                        opts.push(bump::BumpOptions::Minor);
+                        opts.push(commands::bump::BumpOptions::Minor);
                     }
                     if vers.patch {
-                        opts.push(bump::BumpOptions::Patch);
+                        opts.push(commands::bump::BumpOptions::Patch);
                     }
                 }
 
                 for path in paths {
-                    match bump::run(path, &opts) {
+                    match commands::bump::run(path.clone(), &opts) {
                         Ok(msg) => result.messages.push(msg),
                         Err(err) => result.errors.push(CliError::InvalidArg(err)),
                     }
@@ -117,9 +117,14 @@ pub fn run() -> CommandResult {
                 result
                     .errors
                     .push(CliError::Unknown(String::from("No modlet name specified")));
-            }
+            } else {
+                println!("Initializing modlet {}", name);
 
-            println!("Initializing modlet {}", name);
+                match commands::init::run(name.clone()) {
+                    Ok(_) => result.messages.push(format!("Created Modlet {}", name)),
+                    Err(err) => result.errors.push(CliError::Unknown(err.to_string())),
+                }
+            }
         }
     };
 
