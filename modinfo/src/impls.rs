@@ -38,8 +38,18 @@ impl Modinfo {
         self.version.value.set_version(version)
     }
 
+    pub fn set_modinfo_version(&mut self, version: ModinfoVersion) {
+        self.meta.version = version
+    }
+
     pub fn set_name(&mut self, name: &str) {
         self.name = ModinfoValue {
+            value: Some(name.to_owned()),
+        }
+    }
+
+    pub fn set_display_name(&mut self, name: &str) {
+        self.display_name = ModinfoValue {
             value: Some(name.to_owned()),
         }
     }

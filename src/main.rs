@@ -12,7 +12,7 @@ pub struct CommandResult {
 fn main() {
     let result = cli::run();
 
-    dbg!(&result);
+    // dbg!(&result);
 
     if result.errors.is_empty() {
         if result.verbose >= 1 {

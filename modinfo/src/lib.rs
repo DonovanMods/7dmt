@@ -110,7 +110,7 @@ impl<'l> From<lenient_semver_parser::Error<'l>> for ModinfoError<'l> {
 /// </xml>
 /// ```
 #[derive(Debug, PartialEq)]
-enum ModinfoVersion {
+pub enum ModinfoVersion {
     V1,
     V2,
 }

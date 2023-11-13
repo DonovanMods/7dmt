@@ -35,6 +35,9 @@ pub enum Commands {
     Init {
         /// The name of the modlet to create
         name: String,
+
+        #[command(flatten)]
+        version: Option<RequestedVersion>,
     },
 }
 
@@ -65,6 +68,17 @@ pub struct Vers {
     /// auto inc patch
     #[arg(long)]
     patch: bool,
+}
+
+#[derive(Args, Debug)]
+#[group(required = false)]
+pub struct RequestedVersion {
+    /// Use ModInfo.xml V1 (old) Version
+    #[arg(long, value_name = "V1")]
+    pub v1: bool,
+    /// Use ModInfo.xml V2 Version (default)
+    #[arg(long, value_name = "V2")]
+    pub v2: bool,
 }
 
 #[derive(Debug)]
@@ -112,15 +126,13 @@ pub fn run() -> CommandResult {
                 }
             }
         }
-        Commands::Init { name } => {
+        Commands::Init { name, version } => {
             if name.is_empty() {
                 result
                     .errors
                     .push(CliError::Unknown(String::from("No modlet name specified")));
             } else {
-                println!("Initializing modlet {}", name);
-
-                match commands::init::run(name.clone()) {
+                match commands::init::run(name.clone(), version) {
                     Ok(_) => result.messages.push(format!("Created Modlet {}", name)),
                     Err(err) => result.errors.push(CliError::Unknown(err.to_string())),
                 }
