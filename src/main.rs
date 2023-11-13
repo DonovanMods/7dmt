@@ -1,4 +1,5 @@
 mod dmt;
+use console::{style, Term};
 use dmt::cli;
 use std::process::exit;
 
@@ -9,7 +10,9 @@ pub struct CommandResult {
     verbose: u8,
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let stdout = Term::stdout();
+    let stderr = Term::stderr();
     let result = cli::run();
 
     // dbg!(&result);
@@ -17,17 +20,18 @@ fn main() {
     if result.errors.is_empty() {
         if result.verbose >= 1 {
             for message in result.messages {
-                println!("{}", message);
+                stdout.write_line(&message)?;
             }
         }
         exit(0)
     } else {
         for error in result.errors {
-            match error {
-                cli::CliError::NoModletPath => eprintln!("No modlet path specified"),
-                cli::CliError::InvalidArg(msg) => eprintln!("Invalid argument: {}", msg),
-                cli::CliError::Unknown(msg) => eprintln!("Unknown error: {}", msg),
-            }
+            let errmsg = match error {
+                cli::CliError::NoModletPath => "No modlet path specified".to_owned(),
+                cli::CliError::InvalidArg(msg) => format!("Invalid argument: {}", msg),
+                cli::CliError::Unknown(msg) => format!("Unknown error: {}", msg),
+            };
+            stderr.write_line(format!("{}", style(&errmsg).red().bold()).as_ref())?;
         }
         exit(1)
     }

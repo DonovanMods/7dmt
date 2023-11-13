@@ -13,4 +13,6 @@ members = ["modinfo"]
 
 [dependencies]
 clap = { version = "4.4.7", features = ["derive", "env"] }
+console = "0.15.7"
+dialoguer = "0.11.0"
 modinfo = { path = "./modinfo" }

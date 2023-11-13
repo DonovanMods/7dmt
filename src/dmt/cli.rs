@@ -37,7 +37,7 @@ pub enum Commands {
         name: String,
 
         #[command(flatten)]
-        version: Option<RequestedVersion>,
+        requested_version: Option<RequestedVersion>,
     },
 }
 
@@ -71,7 +71,7 @@ pub struct Vers {
 }
 
 #[derive(Args, Debug)]
-#[group(required = false)]
+#[group(required = false, multiple = false)]
 pub struct RequestedVersion {
     /// Use ModInfo.xml V1 (old) Version
     #[arg(long, value_name = "V1")]
@@ -126,14 +126,18 @@ pub fn run() -> CommandResult {
                 }
             }
         }
-        Commands::Init { name, version } => {
+        Commands::Init {
+            name,
+            requested_version,
+        } => {
             if name.is_empty() {
                 result
                     .errors
                     .push(CliError::Unknown(String::from("No modlet name specified")));
             } else {
-                match commands::init::run(name.clone(), version) {
-                    Ok(_) => result.messages.push(format!("Created Modlet {}", name)),
+                match commands::init::run(name.clone(), requested_version) {
+                    Ok(true) => result.messages.push(format!("Created Modlet {}", name)),
+                    Ok(false) => result.messages.push("Cancelled".to_owned()),
                     Err(err) => result.errors.push(CliError::Unknown(err.to_string())),
                 }
             }
