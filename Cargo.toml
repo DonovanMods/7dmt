@@ -1,10 +1,14 @@
 [package]
 name = "dmt"
-description = "A command line too for managing 7 Days to Die Modlet builds"
-repository = "https://github.com/DonovanMods/dmt"
+description = "'7 Days Modding Tool' - A command line tool for managing 7 Days to Die Modlet builds"
+repository = "https://github.com/DonovanMods/7dmt"
 authors = ["Donovan C. Young"]
 edition = "2021"
 version = "0.1.0"
+
+[[bin]]
+name = "7dmt"
+path = "src/main.rs"
 
 [dependencies]
 clap = { version = "~4.4", features = ["derive", "env"] }
