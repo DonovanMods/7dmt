@@ -51,6 +51,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.75"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4668cab20f66d8d020e1fbc0ebe47217433c1b6c8f2040faf858554e394ace6"
+
+[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -153,10 +159,12 @@ dependencies = [
 name = "dmt"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "clap",
  "console",
  "dialoguer",
  "modinfo_7dtd",
+ "thiserror",
 ]
 
 [[package]]
@@ -253,9 +261,9 @@ checksum = "f665ee40bc4a3c5590afb1e9677db74a508659dfd71e126420da8274909a0167"
 
 [[package]]
 name = "modinfo_7dtd"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb27655868758b0ec4134e87f3a16a02c9a0a18bf490437e2b0c534a5eb0e354"
+checksum = "3f8a4fb352fee76ce39ed566ac297abbeea16fde4cf5a58de2b6a96e5847406d"
 dependencies = [
  "convert_case",
  "lenient_semver",
@@ -264,6 +272,7 @@ dependencies = [
  "lenient_version",
  "quick-xml",
  "semver",
+ "thiserror",
 ]
 
 [[package]]

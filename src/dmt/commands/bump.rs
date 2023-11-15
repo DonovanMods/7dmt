@@ -1,5 +1,5 @@
 use modinfo::ModinfoError;
-use std::path::PathBuf;
+use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub enum BumpOptions {
@@ -10,18 +10,16 @@ pub enum BumpOptions {
     Verbosity(u8),
 }
 
-pub fn run(modlet: PathBuf, opts: Vec<BumpOptions>) -> Result<String, String> {
+pub fn run(modlet: impl AsRef<Path>, opts: Vec<BumpOptions>) -> Result<String, String> {
     // dbg!(opts);
 
     let mut verbosity = 0;
-    let mut modinfo = match modinfo::parse(modlet.clone()) {
+    let mut modinfo = match modinfo::parse(modlet.as_ref()) {
         Ok(result) => result,
         Err(err) => {
             return match err {
-                ModinfoError::IoError(err) => {
-                    Err(format!("Could not read {}: {}", modlet.display(), err))
-                }
-                ModinfoError::FsNotFound => Err(format!("{} does not exist", modlet.display())),
+                ModinfoError::IoError(err) => Err(format!("Could not read {}: {}", modlet.as_ref().display(), err)),
+                ModinfoError::FsNotFound => Err(format!("{} does not exist", modlet.as_ref().display())),
                 _ => Err(format!("Could not parse modinfo: {:?}", err)),
             }
         }
@@ -47,7 +45,7 @@ pub fn run(modlet: PathBuf, opts: Vec<BumpOptions>) -> Result<String, String> {
     match &modinfo.write(None) {
         Ok(_) => Ok(format!(
             "Bumped version of {} from {} to {}",
-            modlet.display(),
+            modlet.as_ref().display(),
             old_ver,
             modinfo.get_version(),
         )),

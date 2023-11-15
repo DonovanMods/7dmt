@@ -11,7 +11,10 @@ name = "7dmt"
 path = "src/main.rs"
 
 [dependencies]
+anyhow = "1.0.75"
 clap = { version = "~4.4", features = ["derive", "env"] }
 console = "~0.15"
 dialoguer = "~0.11"
-modinfo_7dtd = "~0.1"
+modinfo_7dtd = "0.1.1"
+# modinfo_7dtd = { version = "0.1.1", path = "../modinfo-7dtd" }
+thiserror = "1.0.50"

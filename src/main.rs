@@ -27,12 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         exit(0)
     } else {
         for error in result.errors {
-            let errmsg = match error {
-                cli::CliError::NoModletPath => "No modlet path specified".to_owned(),
-                cli::CliError::InvalidArg(msg) => format!("Invalid argument: {}", msg),
-                cli::CliError::Unknown(msg) => format!("Unknown error: {}", msg),
-            };
-            stderr.write_line(format!("{}", style(&errmsg).red().bold()).as_ref())?;
+            stderr.write_line(format!("{}", style(&error).red().bold()).as_ref())?;
         }
         exit(1)
     }

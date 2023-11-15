@@ -3,10 +3,7 @@ use dialoguer::{theme::ColorfulTheme, Confirm};
 use modinfo::{Modinfo, ModinfoError};
 use std::{fs, path::PathBuf};
 
-pub fn run(
-    name: String,
-    requested_version: &Option<RequestedVersion>,
-) -> Result<bool, ModinfoError> {
+pub fn run(name: String, requested_version: &Option<RequestedVersion>) -> Result<bool, ModinfoError> {
     let config_path: PathBuf = [".", &name, "Config/.keep"].iter().collect();
     let modinfo_path: PathBuf = [".", &name, "ModInfo.xml"].iter().collect();
     let readme_path: PathBuf = [".", &name, "README.md"].iter().collect();
@@ -23,14 +20,7 @@ pub fn run(
         }
     }
 
-    let modinfo_version = match requested_version {
-        Some(ver) => match ver {
-            _ if ver.v1 => modinfo::ModinfoVersion::V1,
-            _ if ver.v2 => modinfo::ModinfoVersion::V2,
-            _ => modinfo::ModinfoVersion::V2,
-        },
-        None => modinfo::ModinfoVersion::V2,
-    };
+    let modinfo_version = super::requested_version_to_modinfo_version(requested_version);
 
     fs::create_dir_all(config_path)?;
     fs::write(readme_path, format!("# {}", name))?;

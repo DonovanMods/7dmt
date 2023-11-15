@@ -1,7 +1,8 @@
-use super::super::CommandResult;
 use super::commands;
+use crate::CommandResult;
 use clap::{Args, Parser, Subcommand};
 use std::{fmt, path::PathBuf};
+use thiserror::Error;
 
 #[derive(Debug, Parser)]
 #[command(about, author, version, long_about = None)]
@@ -35,6 +36,16 @@ pub enum Commands {
         /// The name of the modlet to create
         name: String,
 
+        /// [Optionally] the ModInfo version to use (default: V2)
+        #[command(flatten)]
+        requested_version: Option<RequestedVersion>,
+    },
+    /// Convert a ModInfo.xml from V1 to V2 (or vice versa)
+    Convert {
+        /// The modlet path(s) to operate on
+        paths: Vec<PathBuf>,
+
+        /// [Optionally] the ModInfo version to convert to (default: V2)
         #[command(flatten)]
         requested_version: Option<RequestedVersion>,
     },
@@ -45,6 +56,7 @@ impl fmt::Display for Commands {
         match self {
             Commands::Bump { .. } => write!(f, "Bump"),
             Commands::Init { .. } => write!(f, "Init"),
+            Commands::Convert { .. } => write!(f, "Convert"),
         }
     }
 }
@@ -80,10 +92,13 @@ pub struct RequestedVersion {
     pub v2: bool,
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum CliError {
+    #[error("No modlet path specified")]
     NoModletPath,
+    #[error("Invalid argument: {0}")]
     InvalidArg(String),
+    #[error("Unknown error: {0}")]
     Unknown(String),
 }
 
@@ -138,6 +153,23 @@ pub fn run() -> CommandResult {
                     Ok(true) => result.messages.push(format!("Created Modlet {}", name)),
                     Ok(false) => result.messages.push("Cancelled".to_owned()),
                     Err(err) => result.errors.push(CliError::Unknown(err.to_string())),
+                }
+            }
+        }
+        Commands::Convert {
+            paths,
+            requested_version,
+        } => {
+            if paths.is_empty() {
+                result.errors.push(CliError::NoModletPath);
+            } else {
+                for path in paths {
+                    match commands::convert::run(path, requested_version) {
+                        Ok(_) => result
+                            .messages
+                            .push(format!("Successfully converted {}", path.display())),
+                        Err(err) => result.errors.push(CliError::InvalidArg(err.to_string())),
+                    }
                 }
             }
         }
