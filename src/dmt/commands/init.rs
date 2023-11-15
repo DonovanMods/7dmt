@@ -3,10 +3,10 @@ use dialoguer::{theme::ColorfulTheme, Confirm};
 use modinfo::{Modinfo, ModinfoError};
 use std::{fs, path::PathBuf};
 
-pub fn run<'m>(
+pub fn run(
     name: String,
     requested_version: &Option<RequestedVersion>,
-) -> Result<bool, ModinfoError<'m>> {
+) -> Result<bool, ModinfoError> {
     let config_path: PathBuf = [".", &name, "Config/.keep"].iter().collect();
     let modinfo_path: PathBuf = [".", &name, "ModInfo.xml"].iter().collect();
     let readme_path: PathBuf = [".", &name, "README.md"].iter().collect();
@@ -37,8 +37,8 @@ pub fn run<'m>(
 
     let mut modinfo = Modinfo::new();
     modinfo.set_modinfo_version(modinfo_version);
-    modinfo.set_name(&name);
-    modinfo.set_display_name(&name);
+    modinfo.set_value_for("name", &name);
+    modinfo.set_value_for("display_name", &name);
     match modinfo.write(Some(&modinfo_path)) {
         Ok(_) => Ok(true),
         Err(_) => Err(ModinfoError::WriteError),

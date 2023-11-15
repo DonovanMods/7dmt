@@ -1,8 +1,7 @@
 use super::super::CommandResult;
 use super::commands;
 use clap::{Args, Parser, Subcommand};
-use std::fmt;
-use std::path::PathBuf;
+use std::{fmt, path::PathBuf};
 
 #[derive(Debug, Parser)]
 #[command(about, author, version, long_about = None)]
@@ -119,7 +118,7 @@ pub fn run() -> CommandResult {
                 }
 
                 for path in paths {
-                    match commands::bump::run(path.clone(), &opts) {
+                    match commands::bump::run(path.clone(), opts.clone()) {
                         Ok(msg) => result.messages.push(msg),
                         Err(err) => result.errors.push(CliError::InvalidArg(err)),
                     }

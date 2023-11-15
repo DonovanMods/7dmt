@@ -1,7 +1,7 @@
 use modinfo::ModinfoError;
 use std::path::PathBuf;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BumpOptions {
     Major,
     Minor,
@@ -10,7 +10,7 @@ pub enum BumpOptions {
     Verbosity(u8),
 }
 
-pub fn run(modlet: PathBuf, opts: &Vec<BumpOptions>) -> Result<String, String> {
+pub fn run(modlet: PathBuf, opts: Vec<BumpOptions>) -> Result<String, String> {
     // dbg!(opts);
 
     let mut verbosity = 0;
@@ -35,7 +35,7 @@ pub fn run(modlet: PathBuf, opts: &Vec<BumpOptions>) -> Result<String, String> {
             BumpOptions::Minor => modinfo.bump_version_minor(),
             BumpOptions::Patch => modinfo.bump_version_patch(),
             BumpOptions::Verbosity(some) => {
-                verbosity = *some;
+                verbosity = some;
             }
         }
     }
@@ -43,8 +43,6 @@ pub fn run(modlet: PathBuf, opts: &Vec<BumpOptions>) -> Result<String, String> {
     if verbosity >= 1 {
         dbg!(&modinfo);
     }
-
-    // TODO: bump version here!
 
     match &modinfo.write(None) {
         Ok(_) => Ok(format!(
