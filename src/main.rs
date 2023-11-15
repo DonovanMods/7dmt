@@ -1,7 +1,8 @@
-mod dmt;
 use console::{style, Term};
 use dmt::cli;
 use std::process::exit;
+
+mod dmt;
 
 #[derive(Default, Debug)]
 pub struct CommandResult {

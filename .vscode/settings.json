@@ -1,0 +1,3 @@
+{
+  "rust-analyzer.linkedProjects": ["./modinfo_7dtd/Cargo.toml"]
+}

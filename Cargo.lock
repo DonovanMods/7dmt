@@ -156,7 +156,7 @@ dependencies = [
  "clap",
  "console",
  "dialoguer",
- "modinfo",
+ "modinfo_7dtd",
 ]
 
 [[package]]
@@ -252,8 +252,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f665ee40bc4a3c5590afb1e9677db74a508659dfd71e126420da8274909a0167"
 
 [[package]]
-name = "modinfo"
+name = "modinfo_7dtd"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb27655868758b0ec4134e87f3a16a02c9a0a18bf490437e2b0c534a5eb0e354"
 dependencies = [
  "convert_case",
  "lenient_semver",
