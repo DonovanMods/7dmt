@@ -1,10 +1,22 @@
 [package]
 name = "dmt"
 description = "'7 Days Modding Tool' - A command line tool for managing 7 Days to Die Modlet builds"
-repository = "https://github.com/DonovanMods/7dmt"
 authors = ["Donovan C. Young"]
 edition = "2021"
 version = "0.1.0"
+rust-version = "1.73"
+readme = "README.md"
+repository = "https://github.com/DonovanMods/7dmt"
+documentation = "https://docs.rs/7dmt"
+license = "MIT OR Apache-2.0"
+keywords = ["7dtd", "game-dev", "modinfo", "xml", "modding"]
+categories = [
+  "development-tools",
+  "game-development",
+  "parser-implementations",
+  "command-line-utilities",
+]
+exclude = [".trunk/*", "tests/*", "src/tests/*"]
 
 [[bin]]
 name = "7dmt"
@@ -16,5 +28,4 @@ clap = { version = "~4.4", features = ["derive", "env"] }
 console = "~0.15"
 dialoguer = "~0.11"
 modinfo_7dtd = "0.1.1"
-# modinfo_7dtd = { version = "0.1.1", path = "../modinfo-7dtd" }
 thiserror = "1.0.50"
