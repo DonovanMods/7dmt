@@ -1,18 +1,19 @@
 use super::commands;
 use crate::CommandResult;
 use clap::{Args, Parser, Subcommand};
+use eyre::Result;
 use std::{fmt, path::PathBuf};
 use thiserror::Error;
 
 #[derive(Debug, Parser)]
 #[command(about, author, version, long_about = None)]
 pub struct Cli {
-    #[arg(short, long, global = true, value_name = "FILE")]
     /// Specify a custom config file
+    #[arg(short, long, global = true, value_name = "FILE")]
     config: Option<PathBuf>,
 
-    #[arg(short, long, global = true, action = clap::ArgAction::Count)]
     /// Verbose mode (may be repeated for increased verbosity)
+    #[arg(short, long, global = true, action = clap::ArgAction::Count)]
     verbose: u8,
 
     #[command(subcommand)]
@@ -21,8 +22,8 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    #[command(arg_required_else_help = true)]
     /// Bump the version of a modlet
+    #[command(arg_required_else_help = true)]
     Bump {
         /// The modlet path to operate on
         paths: Vec<PathBuf>,
@@ -31,16 +32,8 @@ pub enum Commands {
         /// The version to set
         vers: Vers,
     },
-    /// Initialize a new modlet
-    Init {
-        /// The name of the modlet to create
-        name: String,
-
-        /// [Optionally] the ModInfo version to use (default: V2)
-        #[command(flatten)]
-        requested_version: Option<RequestedVersion>,
-    },
     /// Convert a ModInfo.xml from V1 to V2 (or vice versa)
+    #[command(arg_required_else_help = true)]
     Convert {
         /// The modlet path(s) to operate on
         paths: Vec<PathBuf>,
@@ -49,14 +42,31 @@ pub enum Commands {
         #[command(flatten)]
         requested_version: Option<RequestedVersion>,
     },
+    /// Initialize a new modlet
+    #[command(arg_required_else_help = true)]
+    Init {
+        /// The name of the modlet to create
+        name: String,
+
+        /// [Optionally] the ModInfo version to use (default: V2)
+        #[command(flatten)]
+        requested_version: Option<RequestedVersion>,
+    },
+    /// Validate Modlets
+    #[command(arg_required_else_help = true)]
+    Validate {
+        /// The modlet path(s) to operate on
+        paths: Vec<PathBuf>,
+    },
 }
 
 impl fmt::Display for Commands {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Commands::Bump { .. } => write!(f, "Bump"),
-            Commands::Init { .. } => write!(f, "Init"),
             Commands::Convert { .. } => write!(f, "Convert"),
+            Commands::Init { .. } => write!(f, "Init"),
+            Commands::Validate { .. } => write!(f, "Validate"),
         }
     }
 }
@@ -94,15 +104,15 @@ pub struct RequestedVersion {
 
 #[derive(Error, Debug)]
 pub enum CliError {
-    #[error("No modlet path specified")]
-    NoModletPath,
     #[error("Invalid argument: {0}")]
     InvalidArg(String),
+    #[error("No modlet path specified")]
+    NoModletPath,
     #[error("Unknown error: {0}")]
     Unknown(String),
 }
 
-pub fn run() -> CommandResult {
+pub fn run() -> Result<CommandResult> {
     let cli = Cli::parse();
     let mut result = CommandResult {
         verbose: cli.verbose,
@@ -140,22 +150,6 @@ pub fn run() -> CommandResult {
                 }
             }
         }
-        Commands::Init {
-            name,
-            requested_version,
-        } => {
-            if name.is_empty() {
-                result
-                    .errors
-                    .push(CliError::Unknown(String::from("No modlet name specified")));
-            } else {
-                match commands::init::run(name.clone(), requested_version) {
-                    Ok(true) => result.messages.push(format!("Created Modlet {}", name)),
-                    Ok(false) => result.messages.push("Cancelled".to_owned()),
-                    Err(err) => result.errors.push(CliError::Unknown(err.to_string())),
-                }
-            }
-        }
         Commands::Convert {
             paths,
             requested_version,
@@ -173,9 +167,32 @@ pub fn run() -> CommandResult {
                 }
             }
         }
+        Commands::Init {
+            name,
+            requested_version,
+        } => {
+            if name.is_empty() {
+                result
+                    .errors
+                    .push(CliError::Unknown(String::from("No modlet name specified")));
+            } else {
+                match commands::init::run(name.clone(), requested_version) {
+                    Ok(true) => result.messages.push(format!("Created Modlet {}", name)),
+                    Ok(false) => result.messages.push("Cancelled".to_owned()),
+                    Err(err) => result.errors.push(CliError::Unknown(err.to_string())),
+                }
+            }
+        }
+        Commands::Validate { paths } => {
+            if paths.is_empty() {
+                result.errors.push(CliError::NoModletPath);
+            } else {
+                commands::validate::run(paths)?
+            }
+        }
     };
 
-    result
+    Ok(result)
 }
 
 mod tests {

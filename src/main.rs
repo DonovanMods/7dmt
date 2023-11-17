@@ -1,3 +1,4 @@
+use color_eyre::eyre::Result;
 use console::{style, Term};
 use dmt::cli;
 use std::process::exit;
@@ -11,10 +12,12 @@ pub struct CommandResult {
     verbose: u8,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
+    color_eyre::install()?;
+
     let stdout = Term::stdout();
     let stderr = Term::stderr();
-    let result = cli::run();
+    let result = cli::run()?;
 
     // dbg!(&result);
 
@@ -26,6 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         exit(0)
     } else {
+        // Err(result.errors.map(|e| e.into()));
         for error in result.errors {
             stderr.write_line(format!("{}", style(&error).red().bold()).as_ref())?;
         }

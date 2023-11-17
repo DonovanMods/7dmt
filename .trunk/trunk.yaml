@@ -19,10 +19,10 @@ lint:
     - yamllint@1.33.0
     - checkov@3.0.36
     - prettier@3.1.0
-    - clippy@1.73.0
+    - clippy@1.74.0
     - git-diff-check
     - osv-scanner@1.4.3
-    - rustfmt@1.65.0
+    - rustfmt@1.74.0
     - taplo@0.8.1
     - trufflehog@3.62.1
 actions:

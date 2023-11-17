@@ -8,16 +8,14 @@ pub fn run(name: String, requested_version: &Option<RequestedVersion>) -> Result
     let modinfo_path: PathBuf = [".", &name, "ModInfo.xml"].iter().collect();
     let readme_path: PathBuf = [".", &name, "README.md"].iter().collect();
 
-    if modinfo_path.exists() {
-        let confirmation = Confirm::with_theme(&ColorfulTheme::default())
+    if modinfo_path.exists()
+        && !Confirm::with_theme(&ColorfulTheme::default())
             .with_prompt(format!("Modlet {} already exists. Overwrite?", name))
             .default(false)
             .interact()
-            .unwrap();
-
-        if !confirmation {
-            return Ok(false);
-        }
+            .unwrap()
+    {
+        return Ok(false);
     }
 
     let modinfo_version = super::requested_version_to_modinfo_version(requested_version);

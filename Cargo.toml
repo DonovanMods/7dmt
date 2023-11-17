@@ -26,9 +26,13 @@ path = "src/main.rs"
 unsafe_code = "forbid"
 
 [dependencies]
-anyhow = "1.0.75"
 clap = { version = "~4.4", features = ["derive", "env"] }
+color-eyre = { version = "0.6.2", default-features = false }
 console = "~0.15"
-dialoguer = "~0.11"
+dialoguer = "0.11.0"
+eyre = "0.6.8"
+indicatif = { version = "0.17.7", features = ["rayon"] }
 modinfo_7dtd = "0.1.1"
+pad = "0.1.6"
+rayon = "1.8.0"
 thiserror = "1.0.50"
