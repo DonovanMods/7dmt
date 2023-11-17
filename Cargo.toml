@@ -3,8 +3,8 @@ name = "dmt"
 description = "'7 Days Modding Tool' - A command line tool for managing 7 Days to Die Modlet builds"
 authors = ["Donovan C. Young"]
 edition = "2021"
-version = "0.1.0"
-rust-version = "1.73"
+version = "0.2.0"
+rust-version = "1.74"
 readme = "README.md"
 repository = "https://github.com/DonovanMods/7dmt"
 documentation = "https://docs.rs/7dmt"
@@ -21,6 +21,9 @@ exclude = [".trunk/*", "tests/*", "src/tests/*"]
 [[bin]]
 name = "7dmt"
 path = "src/main.rs"
+
+[lints.rust]
+unsafe_code = "forbid"
 
 [dependencies]
 anyhow = "1.0.75"
