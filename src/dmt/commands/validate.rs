@@ -1,5 +1,6 @@
 use color_eyre::eyre::{eyre, Result};
-use console::{pad_str_with, style, Alignment, Term};
+use console::{pad_str_with, style, Alignment};
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use std::{
     ffi::OsStr,
@@ -30,26 +31,33 @@ pub fn verified_paths(paths: &Vec<PathBuf>) -> Result<Vec<PathBuf>> {
     Ok(sanitized_paths)
 }
 
-pub fn validate(path: impl AsRef<Path>, padding: usize, outbuf: &Term) -> Result<()> {
+pub fn validate(path: impl AsRef<Path>, padding: usize, pb: &ProgressBar, verbosity: u8) -> Result<()> {
     let file_name = path.as_ref().file_name().unwrap_or(OsStr::new("")).to_str().unwrap();
-
-    // print!("Validating {}{:padding$} ", path.as_ref().file_name().unwrap_or(OsStr::new("")).to_str().unwrap(), "...");
-
-    outbuf.write_line(
-        format!(
+    if verbosity > 0 {
+        pb.set_prefix(format!(
             "Validating {} ",
             pad_str_with(file_name, padding + 3, Alignment::Left, None, '.')
-        )
-        .as_ref(),
-    )?; // .pad_to_width_with_char(padding + 3, '.'));
+        ));
+    }
 
-    thread::sleep(Duration::from_millis(1000));
+    // TODO: Actually validate the modlet.
+    for _ in 0..100 {
+        if verbosity > 0 {
+            pb.inc(1);
+        }
+        thread::sleep(Duration::from_millis(10));
+    }
+
     Ok(())
 }
 
-pub fn run(dirty_paths: &Vec<PathBuf>) -> Result<()> {
+pub fn run(dirty_paths: &Vec<PathBuf>, verbosity: u8) -> Result<()> {
     let verified_paths = verified_paths(dirty_paths)?;
-    let outbuf = Term::stdout();
+    let count = verified_paths.len() as u64;
+    let mp = MultiProgress::new();
+    let spinner_style = ProgressStyle::with_template("{prefix:.cyan.bright} {spinner} {wide_msg}")
+        .unwrap()
+        .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ");
     let padding = verified_paths
         .iter()
         .map(|p| p.as_path().file_name().unwrap().len())
@@ -57,16 +65,23 @@ pub fn run(dirty_paths: &Vec<PathBuf>) -> Result<()> {
         .unwrap_or(0);
 
     // Using `par_iter()` to parallelize the validation of each modlet.
-    verified_paths
-        .par_iter()
-        .for_each(|path| match validate(path, padding, &outbuf) {
-            Ok(_) => outbuf
-                .write_line(format!("{}", style("OK").green().bold()).as_ref())
-                .unwrap(),
-            Err(err) => outbuf
-                .write_line(format!("{}", style(err).red().bold()).as_ref())
-                .unwrap(),
-        });
+    verified_paths.par_iter().for_each(|path| {
+        let pb = mp.add(ProgressBar::new(count));
+        pb.set_style(spinner_style.clone());
+
+        match validate(path, padding, &pb, verbosity) {
+            Ok(_) => {
+                if verbosity > 0 {
+                    pb.finish_with_message(style("OKAY").green().bold().to_string());
+                }
+            }
+            Err(err) => {
+                if verbosity > 0 {
+                    pb.finish_with_message(style(err).red().bold().to_string());
+                }
+            }
+        }
+    });
 
     Ok(())
 }

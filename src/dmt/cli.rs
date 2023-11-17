@@ -187,7 +187,7 @@ pub fn run() -> Result<CommandResult> {
             if paths.is_empty() {
                 result.errors.push(CliError::NoModletPath);
             } else {
-                commands::validate::run(paths)?
+                commands::validate::run(paths, cli.verbose)?
             }
         }
     };
