@@ -2,7 +2,9 @@ use super::commands;
 use crate::CommandResult;
 use clap::{Args, Parser, Subcommand};
 use eyre::Result;
-use std::{fmt, path::PathBuf};
+use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
+use std::{fmt, path::PathBuf, sync::RwLock};
 use thiserror::Error;
 
 #[derive(Debug, Parser)]
@@ -15,6 +17,9 @@ pub struct Cli {
     /// Verbose mode (may be repeated for increased verbosity)
     #[arg(short, long, global = true, action = clap::ArgAction::Count)]
     verbose: u8,
+
+    #[arg(short, long, global = true, value_name = "PATH")]
+    game_directory: Option<PathBuf>,
 
     #[command(subcommand)]
     command: Commands,
@@ -102,7 +107,18 @@ pub struct RequestedVersion {
     pub v2: bool,
 }
 
-#[derive(Error, Debug)]
+#[derive(Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct Config {
+    #[serde(default)]
+    pub game_directory: Option<PathBuf>,
+    pub verbosity: u8,
+}
+
+lazy_static! {
+    pub static ref SETTINGS: RwLock<Config> = RwLock::new(Config::default());
+}
+
+#[derive(Debug, Error)]
 pub enum CliError {
     #[error("Invalid argument: {0}")]
     InvalidArg(String),
@@ -114,10 +130,10 @@ pub enum CliError {
 
 pub fn run() -> Result<CommandResult> {
     let cli = Cli::parse();
-    let mut result = CommandResult {
-        verbose: cli.verbose,
-        ..Default::default()
-    };
+    let mut result = CommandResult::default();
+
+    SETTINGS.write().unwrap().game_directory = cli.game_directory;
+    SETTINGS.write().unwrap().verbosity = cli.verbose;
 
     match &cli.command {
         Commands::Bump { paths, vers } => {
@@ -187,7 +203,7 @@ pub fn run() -> Result<CommandResult> {
             if paths.is_empty() {
                 result.errors.push(CliError::NoModletPath);
             } else {
-                commands::validate::run(paths, cli.verbose)?
+                commands::validate::run(paths)?
             }
         }
     };

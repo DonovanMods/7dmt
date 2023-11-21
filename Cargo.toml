@@ -26,15 +26,18 @@ path = "src/main.rs"
 unsafe_code = "forbid"
 
 [dependencies]
-clap = { version = "~4.4", features = ["derive", "env"] }
+clap = { version = "4", features = ["derive", "env"] }
 color-eyre = { version = "0.6.2", default-features = false }
-console = "~0.15"
-dialoguer = "0.11.0"
-eyre = "0.6.8"
-indicatif = { version = "0.17.7", features = ["rayon"] }
-itertools = "0.12.0"
-modinfo_7dtd = "0.1.1"
-pad = "0.1.6"
-rand = "0.8.5"
-rayon = "1.8.0"
-thiserror = "1.0.50"
+console = "0.15"
+dialoguer = "0.11"
+dirs = "5"
+eyre = "0.6"
+indicatif = { version = "0.17", features = ["rayon"] }
+itertools = "0.12"
+lazy_static = "1"
+modinfo_7dtd = "0.1"
+rand = "0.8"
+rayon = "1"
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+thiserror = "1"

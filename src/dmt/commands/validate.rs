@@ -1,3 +1,4 @@
+use crate::dmt::SETTINGS;
 use color_eyre::eyre::{eyre, Result};
 use console::{pad_str_with, style, Alignment, Term};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -36,9 +37,10 @@ pub fn verified_paths(paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
     Ok(verified_paths)
 }
 
-pub fn validate(path: impl AsRef<Path>, padding: usize, pb: &ProgressBar, verbosity: u8) -> Result<()> {
+pub fn validate(path: impl AsRef<Path>, padding: usize, pb: &ProgressBar) -> Result<()> {
     let file_name = path.as_ref().file_name().unwrap_or(OsStr::new("")).to_str().unwrap();
-    if verbosity > 0 {
+    let verbose = SETTINGS.read().unwrap().verbosity > 0;
+    if verbose {
         pb.set_prefix(format!(
             "Validating {} ",
             pad_str_with(file_name, padding + 3, Alignment::Left, None, '.')
@@ -46,25 +48,27 @@ pub fn validate(path: impl AsRef<Path>, padding: usize, pb: &ProgressBar, verbos
     }
 
     // TODO: Actually validate the modlet.
-    for _ in 0..100 {
-        if verbosity > 0 {
-            pb.inc(1);
+    {
+        for _ in 0..100 {
+            if verbose {
+                pb.inc(1);
+            }
+            thread::sleep(Duration::from_millis(10));
         }
-        thread::sleep(Duration::from_millis(10));
-    }
 
-    for rand in 0..random() {
-        if rand % 2 == 0 {
-            return Err(eyre!("Randomly Failed"));
+        for rand in 0..random() {
+            if rand % 2 == 0 {
+                return Err(eyre!("Randomly Failed"));
+            }
         }
     }
 
     Ok(())
 }
 
-pub fn run(dirty_paths: &[PathBuf], verbosity: u8) -> Result<()> {
+pub fn run(dirty_paths: &[PathBuf]) -> Result<()> {
+    let verbose = SETTINGS.read().unwrap().verbosity > 0;
     let verified_paths = verified_paths(dirty_paths)?;
-    // let mut verified_files = vec![];
     let count = verified_paths.len() as u64;
     let mp = MultiProgress::new();
     let spinner_style = ProgressStyle::with_template("{prefix:.cyan.bright} {spinner} {wide_msg}")
@@ -77,7 +81,7 @@ pub fn run(dirty_paths: &[PathBuf], verbosity: u8) -> Result<()> {
         .unwrap_or(0);
     let term = Term::stdout();
 
-    if verbosity > 0 {
+    if verbose {
         term.clear_screen()?;
         term.write_line(
             style(format!("Validating {count} modlet(s)...\n"))
@@ -94,16 +98,16 @@ pub fn run(dirty_paths: &[PathBuf], verbosity: u8) -> Result<()> {
             let pb = mp.add(ProgressBar::new(count));
             pb.set_style(spinner_style.clone());
 
-            match validate(path, padding, &pb, verbosity) {
+            match validate(path, padding, &pb) {
                 Ok(_) => {
-                    if verbosity > 0 {
+                    if verbose {
                         pb.finish_with_message(style("OKAY").green().bold().to_string());
                     }
                     vf.push(path.to_path_buf());
                 }
 
                 Err(err) => {
-                    if verbosity > 0 {
+                    if verbose {
                         pb.finish_with_message(format!(
                             "{} {}",
                             style("FAIL").red().bold(),
