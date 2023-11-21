@@ -19,8 +19,6 @@ fn main() -> Result<()> {
     let stderr = Term::stderr();
     let result = cli::run()?;
 
-    // dbg!(&result);
-
     if result.errors.is_empty() {
         if result.verbose >= 1 {
             for message in result.messages {
@@ -29,7 +27,6 @@ fn main() -> Result<()> {
         }
         exit(0)
     } else {
-        // Err(result.errors.map(|e| e.into()));
         for error in result.errors {
             stderr.write_line(format!("{}", style(&error).red().bold()).as_ref())?;
         }
