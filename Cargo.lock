@@ -505,8 +505,6 @@ dependencies = [
 [[package]]
 name = "modinfo_7dtd"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f8a4fb352fee76ce39ed566ac297abbeea16fde4cf5a58de2b6a96e5847406d"
 dependencies = [
  "convert_case",
  "lenient_semver",

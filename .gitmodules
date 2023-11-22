@@ -1,0 +1,3 @@
+[submodule "modinfo"]
+	path = modinfo
+	url = https://github.com/DonovanMods/modinfo_7dtd.git

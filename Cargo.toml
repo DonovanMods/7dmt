@@ -25,6 +25,9 @@ path = "src/main.rs"
 [lints.rust]
 unsafe_code = "forbid"
 
+[workspace]
+members = ["modinfo"]
+
 [dependencies]
 clap = { version = "4", features = ["derive", "env"] }
 color-eyre = { version = "0.6.2", default-features = false }
@@ -35,7 +38,7 @@ eyre = "0.6"
 indicatif = { version = "0.17", features = ["rayon"] }
 itertools = "0.12"
 lazy_static = "1"
-modinfo_7dtd = "0.1"
+modinfo = { package = "modinfo_7dtd", path = "modinfo" }
 rand = "0.8"
 rayon = "1"
 serde = { version = "1", features = ["derive"] }
