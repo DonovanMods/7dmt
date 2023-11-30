@@ -3,7 +3,7 @@ use crate::cli::RequestedVersion;
 pub mod bump;
 pub mod convert;
 pub mod init;
-pub mod validate;
+pub mod package;
 
 pub fn requested_version_to_modinfo_version(requested_version: &Option<RequestedVersion>) -> modinfo::ModinfoVersion {
     match requested_version {

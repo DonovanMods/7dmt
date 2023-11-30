@@ -57,9 +57,11 @@ pub enum Commands {
         #[command(flatten)]
         requested_version: Option<RequestedVersion>,
     },
-    /// Validate Modlets
+    // Future: We'll process instructions in special `dmt` xml sections to create
+    // larger modlets -- ala lessgrind.
+    /// Packages Modlets (Bundling and/or Processing `dmt` instructions)
     #[command(arg_required_else_help = true)]
-    Validate {
+    Package {
         /// The modlet path(s) to operate on
         paths: Vec<PathBuf>,
     },
@@ -71,7 +73,7 @@ impl fmt::Display for Commands {
             Commands::Bump { .. } => write!(f, "Bump"),
             Commands::Convert { .. } => write!(f, "Convert"),
             Commands::Init { .. } => write!(f, "Init"),
-            Commands::Validate { .. } => write!(f, "Validate"),
+            Commands::Package { .. } => write!(f, "Package"),
         }
     }
 }
@@ -199,11 +201,11 @@ pub fn run() -> Result<CommandResult> {
                 }
             }
         }
-        Commands::Validate { paths } => {
+        Commands::Package { paths } => {
             if paths.is_empty() {
                 result.errors.push(CliError::NoModletPath);
             } else {
-                commands::validate::run(paths)?
+                commands::package::run(paths)?
             }
         }
     };
