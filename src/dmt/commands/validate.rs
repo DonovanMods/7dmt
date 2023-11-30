@@ -68,6 +68,7 @@ pub fn validate(path: impl AsRef<Path>, padding: usize, pb: &ProgressBar) -> Res
 
 pub fn run(dirty_paths: &[PathBuf]) -> Result<()> {
     let verbose = SETTINGS.read().unwrap().verbosity > 0;
+    let game_dir = SETTINGS.read().unwrap().game_directory.clone();
     let verified_paths = verified_paths(dirty_paths)?;
     let count = verified_paths.len() as u64;
     let mp = MultiProgress::new();
@@ -90,6 +91,19 @@ pub fn run(dirty_paths: &[PathBuf]) -> Result<()> {
                 .as_ref(),
         )?;
     }
+
+    // let gamexmls;
+    if let Some(gamedir) = game_dir {
+        if !gamedir.exists() {
+            return Err(eyre!("Game directory does not exist: {}", gamedir.display()));
+        }
+        // gamexmls = gamexml::read(&gamedir)?;
+    } else {
+        return Err(eyre!("Game directory not set"));
+    }
+
+    // dbg!(gamexmls);
+    return Ok(());
 
     // Using `par_iter()` to parallelize the validation of each modlet.
     let verified_files: Vec<PathBuf> = verified_paths

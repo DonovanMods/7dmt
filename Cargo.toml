@@ -26,15 +26,17 @@ path = "src/main.rs"
 unsafe_code = "forbid"
 
 [workspace]
-members = ["modinfo"]
+members = ["modinfo", "modxml"]
 
 [dependencies]
+anyhow = "1.0.75"
 clap = { version = "4", features = ["derive", "env"] }
 color-eyre = { version = "0.6.2", default-features = false }
 console = "0.15"
 dialoguer = "0.11"
 dirs = "5"
 eyre = "0.6"
+modxml = { package = "modxml_7dtd", path = "modxml" }
 indicatif = { version = "0.17", features = ["rayon"] }
 itertools = "0.12"
 lazy_static = "1"
