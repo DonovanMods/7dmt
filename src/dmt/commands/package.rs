@@ -1,8 +1,10 @@
 use crate::dmt::SETTINGS;
 use color_eyre::eyre::{eyre, Result};
 use console::{pad_str_with, style, Alignment, Term};
+
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use rand::random;
+// use rand::random;
+use modlet::Modlet;
 use rayon::prelude::*;
 use std::{
     ffi::OsStr,
@@ -11,81 +13,123 @@ use std::{
     time::Duration,
 };
 
-pub fn verified_paths(paths: &[PathBuf]) -> Result<Vec<PathBuf>> {
-    let verified_paths = paths
-        .par_iter()
-        .map(|path| path.canonicalize().expect("Failed to canonicalize path {path:?}"))
-        .filter_map(|path| {
-            if path.exists() && path.is_dir() && path.join("modinfo.xml").exists() {
-                Some(path)
-            } else {
-                None
-            }
-        })
-        .collect::<Vec<PathBuf>>();
-
-    if verified_paths.is_empty() {
-        let dirname = if paths[0].is_dir() {
-            paths[0].as_ref()
-        } else {
-            paths[0].parent().unwrap()
-        };
-
-        return Err(eyre!("No valid modlets found in {}", dirname.display()));
-    }
-
-    Ok(verified_paths)
-}
-
-pub fn validate(path: impl AsRef<Path>, padding: usize, pb: &ProgressBar) -> Result<()> {
+/// Reads a modlet's xml files
+fn load(path: impl AsRef<Path>, padding: usize, pb: &ProgressBar) -> Result<Modlet> {
     let file_name = path.as_ref().file_name().unwrap_or(OsStr::new("")).to_str().unwrap();
     let verbose = SETTINGS.read().unwrap().verbosity > 0;
     if verbose {
         pb.set_prefix(format!(
-            "Validating {} ",
-            pad_str_with(file_name, padding + 3, Alignment::Left, None, '.')
+            "Loading {} ",
+            pad_str_with(file_name, padding, Alignment::Left, None, '.')
         ));
     }
 
-    // TODO: Actually validate the modlet.
-    {
-        for _ in 0..100 {
-            if verbose {
-                pb.inc(1);
-            }
-            thread::sleep(Duration::from_millis(10));
-        }
+    let config_dir = path.as_ref().join("config");
+    if !(config_dir.exists() && config_dir.is_dir()) {
+        return Err(eyre!(
+            "Invalid Modlet {}: Config directory does not exist",
+            config_dir.display()
+        ));
+    }
 
-        for rand in 0..random() {
-            if rand % 2 == 0 {
-                return Err(eyre!("Randomly Failed"));
+    // if verbose {
+    //     pb.set_message(format!(
+    //         "Loading {}",
+    //         pad_str_with(xml_file_name, padding, Alignment::Left, None, '.')
+    //     ));
+    // }
+
+    let modlet = Modlet::new(path.as_ref())?;
+
+    // let glob_pattern = config_dir.join("**/*.xml");
+    // for xml_file in glob(glob_pattern.to_str().unwrap())? {
+    //     let xml_file = xml_file?;
+    //     let xml_file_name = xml_file.file_name().unwrap_or(OsStr::new("")).to_str().unwrap();
+    //     if verbose {
+    //         pb.set_message(format!(
+    //             "Loading {}",
+    //             pad_str_with(xml_file_name, padding, Alignment::Left, None, '.')
+    //         ));
+    //     }
+
+    //     if verbose {
+    //         pb.inc(1);
+    //     }
+
+    //     modlet.xmls.push(modlet::ModletXML::load(xml_file)?);
+    // }
+
+    Ok(modlet)
+}
+
+fn package(modlets: &[Modlet], output_modlet: &Path, padding: usize, pb: &ProgressBar) -> Result<()> {
+    let verbose = SETTINGS.read().unwrap().verbosity > 0;
+    let output_modlet_name = output_modlet.file_name().unwrap().to_str().unwrap();
+
+    if verbose {
+        pb.set_prefix(format!(
+            "Packaging {} ",
+            pad_str_with(output_modlet_name, padding, Alignment::Left, None, '.')
+        ));
+    }
+
+    for modlet in modlets {
+        if verbose {
+            pb.set_message(format!(
+                "Bundling {}",
+                pad_str_with(&modlet.name, padding, Alignment::Left, None, '.')
+            ));
+        }
+        {
+            for _ in 0..100 {
+                if verbose {
+                    pb.inc(1);
+                }
+                thread::sleep(Duration::from_millis(1));
             }
         }
     }
 
+    // todo!("Package modlets into a single modlet");
     Ok(())
 }
 
-pub fn run(dirty_paths: &[PathBuf]) -> Result<()> {
+/// Packages one or more modlets into a single modlet
+///
+/// # Arguments
+///
+/// * `modlets` - A list of modlet(s) to package
+/// * `modlet` - The path to the modlet to package into
+///
+/// # Errors
+///
+/// * If the game directory is invalid
+/// * If the modlet path is invalid
+///
+pub fn run(modlets: &[PathBuf], modlet: &Path) -> Result<()> {
     let verbose = SETTINGS.read().unwrap().verbosity > 0;
     let game_dir = SETTINGS.read().unwrap().game_directory.clone();
-    let verified_paths = verified_paths(dirty_paths)?;
-    let count = verified_paths.len() as u64;
+    let count = modlets.len() as u64;
     let mp = MultiProgress::new();
     let spinner_style = ProgressStyle::with_template("{prefix:.cyan.bright} {spinner} {wide_msg}")
         .unwrap()
         .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ");
-    let padding = verified_paths
+    let mut padding = modlets
         .iter()
         .map(|p| p.as_path().file_name().unwrap().len())
         .max()
         .unwrap_or(0);
     let term = Term::stdout();
 
+    let modlet_name = modlet.file_name().unwrap().to_str().unwrap();
+    if padding < modlet_name.len() {
+        padding = modlet_name.len();
+    }
+
     if verbose {
         term.clear_screen()?;
         term.write_line(
-            style(format!("Validating {count} modlet(s)...\n"))
+            style(format!("Packaging {count} modlet(s) into {}...\n", modlet.display()))
                 .yellow()
                 .to_string()
                 .as_ref(),
@@ -103,21 +147,21 @@ pub fn run(dirty_paths: &[PathBuf]) -> Result<()> {
     }
 
     // dbg!(gamexmls);
-    return Ok(());
+    // return Ok(());
 
     // Using `par_iter()` to parallelize the validation of each modlet.
-    let verified_files: Vec<PathBuf> = verified_paths
+    let loaded_modlets: Vec<Modlet> = modlets
         .par_iter()
-        .fold(Vec::<PathBuf>::new, |mut vf, path| {
+        .fold(Vec::<Modlet>::new, |mut vf, path| {
             let pb = mp.add(ProgressBar::new(count));
             pb.set_style(spinner_style.clone());
 
-            match validate(path, padding, &pb) {
-                Ok(_) => {
+            match load(path, padding + 3, &pb) {
+                Ok(modlet) => {
                     if verbose {
                         pb.finish_with_message(style("OKAY").green().bold().to_string());
                     }
-                    vf.push(path.to_path_buf());
+                    vf.push(modlet);
                 }
 
                 Err(err) => {
@@ -133,26 +177,36 @@ pub fn run(dirty_paths: &[PathBuf]) -> Result<()> {
 
             vf
         })
-        .reduce(Vec::<PathBuf>::new, |mut vf, mut v| {
+        .reduce(Vec::<Modlet>::new, |mut vf, mut v| {
             vf.append(&mut v);
             vf
         });
 
-    if (verified_files.len() as u64) == count {
-        term.write_line(
-            style(format!(
-                "\nAll {count} modlet(s) validated successfully!\n",
-                count = count
-            ))
-            .green()
-            .to_string()
-            .as_ref(),
-        )?;
+    if (loaded_modlets.len() as u64) == count {
+        let pb = mp.add(ProgressBar::new(1));
+        pb.set_style(spinner_style.clone());
+
+        match package(&loaded_modlets, modlet, padding + 1, &pb) {
+            Ok(_) => {
+                if verbose {
+                    pb.finish_with_message(style("OKAY").green().bold().to_string());
+                }
+            }
+            Err(err) => {
+                if verbose {
+                    pb.finish_with_message(format!(
+                        "{} {}",
+                        style("FAIL").red().bold(),
+                        style(format!("({err})")).red()
+                    ));
+                }
+            }
+        }
     } else {
         term.write_line(
             style(format!(
-                "\n\n{count} modlet(s) failed to validate!\n",
-                count = count - (verified_files.len() as u64)
+                "\n\n{count} modlet(s) failed to package!\n",
+                count = count - (loaded_modlets.len() as u64)
             ))
             .red()
             .to_string()

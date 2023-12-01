@@ -1,7 +1,7 @@
 use super::commands;
+use crate::dmt::helpers::verify_modlet_paths;
 use crate::CommandResult;
 use clap::{Args, Parser, Subcommand};
-use eyre::Result;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::{fmt, path::PathBuf, sync::RwLock};
@@ -59,11 +59,15 @@ pub enum Commands {
     },
     // Future: We'll process instructions in special `dmt` xml sections to create
     // larger modlets -- ala lessgrind.
-    /// Packages Modlets (Bundling and/or Processing `dmt` instructions)
+    /// Package Modlet(s)
     #[command(arg_required_else_help = true)]
     Package {
+        /// The modlet to package into
+        #[arg(short, long, value_name = "PATH")]
+        output: PathBuf,
+
         /// The modlet path(s) to operate on
-        paths: Vec<PathBuf>,
+        modlets: Vec<PathBuf>,
     },
 }
 
@@ -124,13 +128,15 @@ lazy_static! {
 pub enum CliError {
     #[error("Invalid argument: {0}")]
     InvalidArg(String),
+    #[error("No game directory specified")]
+    NoGameDirectory,
     #[error("No modlet path specified")]
     NoModletPath,
     #[error("Unknown error: {0}")]
     Unknown(String),
 }
 
-pub fn run() -> Result<CommandResult> {
+pub fn run() -> eyre::Result<CommandResult> {
     let cli = Cli::parse();
     let mut result = CommandResult::default();
 
@@ -201,11 +207,14 @@ pub fn run() -> Result<CommandResult> {
                 }
             }
         }
-        Commands::Package { paths } => {
-            if paths.is_empty() {
+        Commands::Package { modlets, output } => {
+            if SETTINGS.read().unwrap().game_directory.is_none() {
+                result.errors.push(CliError::NoGameDirectory);
+            } else if modlets.is_empty() {
                 result.errors.push(CliError::NoModletPath);
             } else {
-                commands::package::run(paths)?
+                let verified_paths = verify_modlet_paths(modlets)?;
+                commands::package::run(&verified_paths, output)?
             }
         }
     };

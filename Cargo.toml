@@ -26,23 +26,35 @@ path = "src/main.rs"
 unsafe_code = "forbid"
 
 [workspace]
-members = ["modinfo", "modxml"]
+resolver = "2"
+members = ["modinfo", "modlet"]
+
+[workspace.dependencies]
+dirs = "5"
+eyre = "0.6"
+glob = "0.3.1"
+itertools = "0.12"
+lazy_static = "1"
+modinfo = { package = "modinfo_7dtd", path = "modinfo" }
+modlet = { package = "modlet_7dtd", path = "modlet" }
+rayon = "1"
+thiserror = "1"
+quick-xml = "0.31"
 
 [dependencies]
-anyhow = "1.0.75"
 clap = { version = "4", features = ["derive", "env"] }
 color-eyre = { version = "0.6.2", default-features = false }
 console = "0.15"
 dialoguer = "0.11"
-dirs = "5"
-eyre = "0.6"
-modxml = { package = "modxml_7dtd", path = "modxml" }
+dirs = { workspace = true }
+eyre = { workspace = true }
+glob = { workspace = true }
 indicatif = { version = "0.17", features = ["rayon"] }
-itertools = "0.12"
-lazy_static = "1"
-modinfo = { package = "modinfo_7dtd", path = "modinfo" }
-rand = "0.8"
-rayon = "1"
+itertools = { workspace = true }
+lazy_static = { workspace = true }
+modinfo = { workspace = true }
+modlet = { workspace = true }
+rayon = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
-thiserror = "1"
+thiserror = { workspace = true }
