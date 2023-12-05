@@ -1,13 +1,14 @@
 [package]
-name = "modxml_7dtd"
+name = "modlet_7dtd"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "modxml"
+name = "modlet"
 crate-type = ["lib"]
 
 [dependencies]
-eyre = "0.6"
-glob = "0.3"
-quick-xml = { version = "0.31", features = ["serialize"] }
+eyre = { workspace = true }
+glob = { workspace = true }
+modinfo = { workspace = true }
+quick-xml = { workspace = true }
