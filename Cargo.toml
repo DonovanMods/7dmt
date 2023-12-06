@@ -1,7 +1,23 @@
 [package]
 name = "modlet_7dtd"
 version = "0.1.0"
+authors = ["Donovan C. Young <dyoung522@gmail.com>"]
+description = "Read/Write '7 Days to Die' Modlet files"
 edition = "2021"
+rust-version = "1.74"
+readme = "README.md"
+homepage = "https://github.com/donovanmods/modlet_7dtd"
+repository = "https://github.com/donovanmods/modlet_7dtd"
+documentation = "https://docs.rs/modlet_7dtd"
+license = "MIT OR Apache-2.0"
+keywords = ["7dtd", "mod", "modlet", "xml", "modding"]
+categories = [
+  "data-structures",
+  "development-tools",
+  "game-development",
+  "parser-implementations",
+]
+exclude = [".trunk/*", "tests/*", "src/tests/*"]
 
 [lib]
 name = "modlet"

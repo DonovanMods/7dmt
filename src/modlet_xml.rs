@@ -1,7 +1,15 @@
-use eyre::{eyre, Result};
+/// This module contains the implementation of the `ModletXML` struct and related types.
+/// The `ModletXML` struct represents an XML file containing modlet instructions.
+/// It provides methods for loading the XML file and extracting the commands from it.
+/// The `Command` enum represents different types of modlet commands that can be found in the XML file.
+/// The `InstructionSet` struct represents a set of instructions for a specific command.
+/// The `CsvInstruction` enum represents the different types of CSV instructions that can be used in the `InstructionSet`.
+/// The `load_xml` function is a helper function that reads the XML file and extracts the commands.
+/// The `get_attribute` function is a helper function that retrieves the value of a specific attribute from an XML element.
+use core::panic;
+use eyre::eyre;
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
-use core::panic;
 use std::{
     borrow::Cow,
     collections::VecDeque,
@@ -11,39 +19,33 @@ use std::{
 };
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum CsvOp {
-    Add,
-    Remove,
+enum CsvInstruction {
+    Add(char),
+    Remove(char),
 }
 
 #[derive(Clone, Default, Debug, PartialEq)]
 pub struct InstructionSet {
     attribute: Option<String>,
-    delim: Option<String>,
     values: Vec<String>,
-    op: Option<CsvOp>,
-    pub xpath: Option<String>,
+    csv_op: Option<CsvInstruction>,
+    xpath: Option<String>,
 }
 
 impl InstructionSet {
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self::default()
     }
 }
 
-/// Modlet types that require additional lines to be added after the Start event
-const COLLECTION_MODLETS: [&str; 3] = [
-    "append",
-    "insert_after",
-    "insert_before",
-];
+// Modlet types that require additional lines to be added after the Start event
+const COLLECTION_COMMANDS: [&str; 3] = ["append", "insert_after", "insert_before"];
+// Modlet types that require additional TEXT lines added
+const TEXT_COMMANDS: [&str; 3] = ["csv", "set", "set_attribute"];
+// Modlet types that are empty tags
+const EMPTY_COMMANDS: [&str; 2] = ["remove", "remove_attribute"];
 
-const TEXT_MODLETS: [&str; 3] = [
-    "csv",
-    "set",
-    "set_attribute",
-];
-
+/// Represents a modlet command instruction
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
     Append(InstructionSet),
@@ -116,18 +118,18 @@ impl Command {
         }
     }
 
-    fn set(&self, modlet: InstructionSet) -> Self {
+    fn set(&mut self, instruction_set: InstructionSet) -> Self {
         match self {
-            Command::Append(_) => Self::Append(modlet),
-            Command::Comment(_) => Self::Comment(modlet.values.join("")),
-            Command::Csv(_) => Self::Csv(modlet),
-            Command::InsertAfter(_) => Self::InsertAfter(modlet),
-            Command::InsertBefore(_) => Self::InsertBefore(modlet),
+            Command::Append(_) => Self::Append(instruction_set),
+            Command::Comment(_) => Self::Comment(instruction_set.values.join("")),
+            Command::Csv(_) => Self::Csv(instruction_set),
+            Command::InsertAfter(_) => Self::InsertAfter(instruction_set),
+            Command::InsertBefore(_) => Self::InsertBefore(instruction_set),
             Command::NoOp => Self::NoOp,
-            Command::Remove(_) => Self::Remove(modlet),
-            Command::RemoveAttribute(_) => Self::RemoveAttribute(modlet),
-            Command::Set(_) => Self::Set(modlet),
-            Command::SetAttribute(_) => Self::SetAttribute(modlet),
+            Command::Remove(_) => Self::Remove(instruction_set),
+            Command::RemoveAttribute(_) => Self::RemoveAttribute(instruction_set),
+            Command::Set(_) => Self::Set(instruction_set),
+            Command::SetAttribute(_) => Self::SetAttribute(instruction_set),
             Command::StartTag(_) => Self::StartTag(None),
             Command::Unknown => Self::Unknown,
         }
@@ -141,14 +143,13 @@ pub struct ModletXML {
 }
 
 impl ModletXML {
-    pub fn load(path: impl AsRef<Path>) -> Result<Self> {
-        if !path.as_ref().exists() {
-            return Err(eyre!("Modlet XML {}: file not found", path.as_ref().display()));
+    pub fn load(mut self) -> eyre::Result<Self> {
+        if !self.path.exists() {
+            return Err(eyre!("Modlet XML {}: file not found", self.path.display()));
         }
-        let path = path.as_ref().to_path_buf();
-        let commands = load_xml(path.as_ref())?;
+        self.commands = load_xml(self.path.as_ref())?;
 
-        Ok(Self { commands, path })
+        Ok(self)
     }
 
     pub fn new(path: impl AsRef<Path>) -> Self {
@@ -168,7 +169,7 @@ impl ModletXML {
     }
 }
 
-fn load_xml(path: &Path) -> Result<Vec<Command>> {
+fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
     let mut commands = Vec::new();
     let mut buf = Vec::new();
     let mut reader = Reader::from_file(path)?;
@@ -186,21 +187,27 @@ fn load_xml(path: &Path) -> Result<Vec<Command>> {
 
             // Found a comment
             Ok(Event::Comment(e)) => {
-                commands.push(Command::Comment(e.unescape().unwrap().trim().to_string()));
+                let comment = e.unescape().unwrap_or_default().trim().to_string();
+
+                if !comment.is_empty() {
+                    commands.push(Command::Comment(comment));
+                }
             }
 
             // Found a start tag
             Ok(Event::Start(e)) => {
-                let tag = str::from_utf8(e.name().as_ref()).unwrap().to_owned();
-                let mut command = Command::from_str(e.name());
+                let tag_name = e.name();
+                let tag_name = str::from_utf8(tag_name.as_ref())?;
+                let mut command = Command::from_str(tag_name);
 
                 if start_tag.is_empty() && command.as_ref() == "unknown" && last_command == "no_op" {
-                    start_tag = tag.to_string();
-                    command = Command::StartTag(Some(tag));
+                    start_tag = tag_name.to_string();
+                    command = Command::StartTag(Some(tag_name.to_string()));
                 }
 
-                if COLLECTION_MODLETS.contains(&last_command) {
-                    modlet.values.push(str::from_utf8(&e).unwrap().to_string());
+                if COLLECTION_COMMANDS.contains(&last_command) {
+                    let tag_string = str::from_utf8(e.as_ref())?;
+                    modlet.values.push(tag_string.to_string());
                 } else if command.as_ref() != "unknown" && command.as_ref() != "no_op" {
                     // println!("[STARTING] tag {:?} ({command})", str::from_utf8(e.name().as_ref()).unwrap());
 
@@ -209,12 +216,17 @@ fn load_xml(path: &Path) -> Result<Vec<Command>> {
                         continue;
                     }
 
+                    let delim: char = get_attribute(&e, "delim")
+                        .unwrap_or(String::from(","))
+                        .chars()
+                        .next()
+                        .unwrap();
+
                     modlet.xpath = get_attribute(&e, "xpath");
-                    modlet.delim = get_attribute(&e, "delim");
-                    modlet.op = match get_attribute(&e, "op") {
+                    modlet.csv_op = match get_attribute(&e, "op") {
                         Some(op) => match op.as_str() {
-                            "add" => Some(CsvOp::Add),
-                            "remove" => Some(CsvOp::Remove),
+                            "add" => Some(CsvInstruction::Add(delim)),
+                            "remove" => Some(CsvInstruction::Remove(delim)),
                             _ => None,
                         },
                         None => None,
@@ -225,10 +237,12 @@ fn load_xml(path: &Path) -> Result<Vec<Command>> {
 
             // This is an empty tag (likely remove or remove_attribute)
             Ok(Event::Empty(e)) => {
-                let value = str::from_utf8(e.as_ref()).unwrap().to_string();
+                let tag_name = e.name();
+                let tag_name = str::from_utf8(tag_name.as_ref())?;
+                let value = str::from_utf8(e.as_ref())?;
 
-                if COLLECTION_MODLETS.contains(&last_command) {
-                    modlet.values.push(value);
+                if EMPTY_COMMANDS.contains(&tag_name) || COLLECTION_COMMANDS.contains(&last_command) {
+                    modlet.values.push(value.to_string());
                 } else {
                     panic!("Unhandled empty tag received: {value}");
                 }
@@ -236,9 +250,10 @@ fn load_xml(path: &Path) -> Result<Vec<Command>> {
 
             // Found text between tags, add it to our struct's value.
             Ok(Event::Text(e)) => {
-                let value = str::from_utf8(&e).unwrap().to_string();
+                let value = str::from_utf8(&e)?;
+                let value = value.to_string();
 
-                if TEXT_MODLETS.contains(&last_command) {
+                if TEXT_COMMANDS.contains(&last_command) {
                     modlet.values.push(value);
                 } else {
                     panic!("Unhandled text tag received: {value}");
@@ -247,15 +262,15 @@ fn load_xml(path: &Path) -> Result<Vec<Command>> {
 
             // Found an end tag
             Ok(Event::End(e)) => {
-                let tag = str::from_utf8(e.as_ref()).unwrap();
+                let tag = str::from_utf8(e.as_ref())?;
                 let mut command = Command::from_str(tag);
 
-                if command.as_ref() == "unknown" && !start_tag.is_empty(){
+                if command.as_ref() == "unknown" && !start_tag.is_empty() {
                     command = Command::StartTag(Some(start_tag.clone()));
                 }
 
-                if COLLECTION_MODLETS.contains(&last_command) && command.as_ref() != last_command {
-                    modlet.values.push(str::from_utf8(&e).unwrap().to_string());
+                if COLLECTION_COMMANDS.contains(&last_command) && command.as_ref() != last_command {
+                    modlet.values.push(tag.to_string());
                 } else {
                     // println!("[ENDING] tag {tag} ({command}) / {last_command}");
 
@@ -277,8 +292,6 @@ fn load_xml(path: &Path) -> Result<Vec<Command>> {
         // if we don't keep a borrow elsewhere, we can clear the buffer to keep memory usage low
         buf.clear();
     }
-
-    // dbg!(&commands);
 
     Ok(commands)
 }
