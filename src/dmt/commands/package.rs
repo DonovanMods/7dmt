@@ -1,6 +1,6 @@
 use crate::dmt::SETTINGS;
 use color_eyre::eyre::{eyre, Result};
-use console::{pad_str_with, style, Alignment, Term};
+use console::{style, Term};
 
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 // use rand::random;
@@ -18,10 +18,7 @@ fn load(path: impl AsRef<Path>, padding: usize, pb: &ProgressBar) -> Result<Modl
     let file_name = path.as_ref().file_name().unwrap_or(OsStr::new("")).to_str().unwrap();
     let verbose = SETTINGS.read().unwrap().verbosity > 0;
     if verbose {
-        pb.set_prefix(format!(
-            "Loading {} ",
-            pad_str_with(file_name, padding, Alignment::Left, None, '.')
-        ));
+        pb.set_prefix(format!("Loading {file_name:.<padding$} "));
     }
 
     let config_dir = path.as_ref().join("config");
@@ -32,32 +29,9 @@ fn load(path: impl AsRef<Path>, padding: usize, pb: &ProgressBar) -> Result<Modl
         ));
     }
 
-    // if verbose {
-    //     pb.set_message(format!(
-    //         "Loading {}",
-    //         pad_str_with(xml_file_name, padding, Alignment::Left, None, '.')
-    //     ));
-    // }
-
     let modlet = Modlet::new(path.as_ref())?;
 
-    // let glob_pattern = config_dir.join("**/*.xml");
-    // for xml_file in glob(glob_pattern.to_str().unwrap())? {
-    //     let xml_file = xml_file?;
-    //     let xml_file_name = xml_file.file_name().unwrap_or(OsStr::new("")).to_str().unwrap();
-    //     if verbose {
-    //         pb.set_message(format!(
-    //             "Loading {}",
-    //             pad_str_with(xml_file_name, padding, Alignment::Left, None, '.')
-    //         ));
-    //     }
-
-    //     if verbose {
-    //         pb.inc(1);
-    //     }
-
-    //     modlet.xmls.push(modlet::ModletXML::load(xml_file)?);
-    // }
+    dbg!(&modlet);
 
     Ok(modlet)
 }
@@ -67,19 +41,14 @@ fn package(modlets: &[Modlet], output_modlet: &Path, padding: usize, pb: &Progre
     let output_modlet_name = output_modlet.file_name().unwrap().to_str().unwrap();
 
     if verbose {
-        pb.set_prefix(format!(
-            "Packaging {} ",
-            pad_str_with(output_modlet_name, padding, Alignment::Left, None, '.')
-        ));
+        pb.set_prefix(format!("Packaging {output_modlet_name:.<padding$} "));
     }
 
     for modlet in modlets {
         if verbose {
-            pb.set_message(format!(
-                "Bundling {}",
-                pad_str_with(&modlet.name, padding, Alignment::Left, None, '.')
-            ));
+            pb.set_message(format!("Bundling {:.<padding$} ", &modlet.name()));
         }
+
         {
             for _ in 0..100 {
                 if verbose {
