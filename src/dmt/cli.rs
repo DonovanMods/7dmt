@@ -182,7 +182,7 @@ pub fn run() -> eyre::Result<CommandResult> {
                 result.errors.push(CliError::NoModletPath);
             } else {
                 for path in paths {
-                    match commands::convert::run(path, requested_version) {
+                    match commands::convert::run(path, requested_version.as_ref()) {
                         Ok(_) => result
                             .messages
                             .push(format!("Successfully converted {}", path.display())),
@@ -200,7 +200,7 @@ pub fn run() -> eyre::Result<CommandResult> {
                     .errors
                     .push(CliError::Unknown(String::from("No modlet name specified")));
             } else {
-                match commands::init::run(name.clone(), requested_version) {
+                match commands::init::run(name.clone(), requested_version.as_ref()) {
                     Ok(true) => result.messages.push(format!("Created Modlet {}", name)),
                     Ok(false) => result.messages.push("Cancelled".to_owned()),
                     Err(err) => result.errors.push(CliError::Unknown(err.to_string())),

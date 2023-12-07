@@ -1,27 +1,29 @@
-use crate::dmt::SETTINGS;
+use crate::dmt::{commands, SETTINGS};
 use color_eyre::eyre::{eyre, Result};
 use console::{style, Term};
-
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-// use rand::random;
 use modlet::Modlet;
+use quick_xml::{
+    events::{BytesEnd, BytesStart, BytesText, Event},
+    Writer,
+};
 use rayon::prelude::*;
 use std::{
-    ffi::OsStr,
+    collections::{btree_map, BTreeMap},
+    fs::{self, File},
     path::{Path, PathBuf},
-    thread,
-    time::Duration,
 };
 
 /// Reads a modlet's xml files
 fn load(path: impl AsRef<Path>, padding: usize, pb: &ProgressBar) -> Result<Modlet> {
-    let file_name = path.as_ref().file_name().unwrap_or(OsStr::new("")).to_str().unwrap();
+    let path = path.as_ref().canonicalize().unwrap_or_default();
+    let file_name = path.file_name().unwrap_or_default().to_str().unwrap();
     let verbose = SETTINGS.read().unwrap().verbosity > 0;
     if verbose {
         pb.set_prefix(format!("Loading {file_name:.<padding$} "));
     }
 
-    let config_dir = path.as_ref().join("config");
+    let config_dir = path.join("config");
     if !(config_dir.exists() && config_dir.is_dir()) {
         return Err(eyre!(
             "Invalid Modlet {}: Config directory does not exist",
@@ -29,38 +31,91 @@ fn load(path: impl AsRef<Path>, padding: usize, pb: &ProgressBar) -> Result<Modl
         ));
     }
 
-    let modlet = Modlet::new(path.as_ref())?;
-
-    dbg!(&modlet);
+    let modlet = Modlet::new(path)?;
 
     Ok(modlet)
 }
 
-fn package(modlets: &[Modlet], output_modlet: &Path, padding: usize, pb: &ProgressBar) -> Result<()> {
+fn package(modlets: &mut [Modlet], output_modlet: &Path, padding: usize, pb: &ProgressBar) -> Result<()> {
     let verbose = SETTINGS.read().unwrap().verbosity > 0;
-    let output_modlet_name = output_modlet.file_name().unwrap().to_str().unwrap();
+    let config_dir = output_modlet.join("config");
+    let output_modlet_name = output_modlet.file_name().unwrap_or_default().to_str().unwrap();
 
     if verbose {
         pb.set_prefix(format!("Packaging {output_modlet_name:.<padding$} "));
     }
 
-    for modlet in modlets {
+    // Create the output modlet if necessary
+    if !output_modlet.exists() {
+        commands::init::create(output_modlet_name, None)?;
+    }
+
+    modlets.sort_by(|a, b| a.name().cmp(&b.name()));
+
+    let files = file_map(modlets);
+
+    // Write XMLs per file
+    for (file, modlets) in files {
+        let config_file = config_dir.join(&file);
+
+        if config_file.exists() {
+            fs::remove_file(&config_file)?;
+        } else {
+            fs::create_dir_all(config_file.parent().unwrap())?;
+        };
+
+        let config_file = File::create(&config_file)?;
+        let mut writer = Writer::new_with_indent(&config_file, b' ', 4);
+        writer.write_event(Event::Start(BytesStart::new("bundle")))?;
+
         if verbose {
-            pb.set_message(format!("Bundling {:.<padding$} ", &modlet.name()));
+            pb.set_message(format!("Bundling XML {}", file.display()));
         }
 
-        {
-            for _ in 0..100 {
-                if verbose {
-                    pb.inc(1);
-                }
-                thread::sleep(Duration::from_millis(1));
+        for modlet in modlets {
+            if verbose {
+                pb.inc(1);
+            }
+
+            // Inject a comment to indicate which modlet the xml came from
+            writer.write_event(Event::Comment(BytesText::new(
+                format!(" Included from {} ", modlet.name()).as_str(),
+            )))?;
+
+            modlet.write_xmls(&mut writer, &file)?;
+        }
+        writer.write_event(Event::End(BytesEnd::new("bundle")))?;
+    }
+
+    if verbose {
+        pb.set_message("Bundling non-xml files...");
+    }
+
+    // Write other files
+    for modlet in modlets {
+        if verbose {
+            pb.inc(1);
+        }
+        modlet.write_files(output_modlet)?;
+    }
+
+    Ok(())
+}
+
+fn file_map(modlets: &[Modlet]) -> BTreeMap<PathBuf, Vec<&Modlet>> {
+    let mut files = BTreeMap::<PathBuf, Vec<&Modlet>>::new();
+    for modlet in modlets {
+        for file in modlet.xml_files() {
+            let file = file.as_ref().to_owned();
+            if let btree_map::Entry::Vacant(e) = files.entry(file.clone()) {
+                e.insert(vec![modlet]);
+            } else {
+                files.get_mut(&file).unwrap().push(modlet);
             }
         }
     }
 
-    // todo!("Package modlets into a single modlet");
-    Ok(())
+    files
 }
 
 /// Packages one or more modlets into a single modlet
@@ -115,11 +170,8 @@ pub fn run(modlets: &[PathBuf], modlet: &Path) -> Result<()> {
         return Err(eyre!("Game directory not set"));
     }
 
-    // dbg!(gamexmls);
-    // return Ok(());
-
-    // Using `par_iter()` to parallelize the validation of each modlet.
-    let loaded_modlets: Vec<Modlet> = modlets
+    // Using `par_iter()` to parallelize the packaging of each modlet.
+    let mut loaded_modlets: Vec<Modlet> = modlets
         .par_iter()
         .fold(Vec::<Modlet>::new, |mut vf, path| {
             let pb = mp.add(ProgressBar::new(count));
@@ -155,7 +207,7 @@ pub fn run(modlets: &[PathBuf], modlet: &Path) -> Result<()> {
         let pb = mp.add(ProgressBar::new(1));
         pb.set_style(spinner_style.clone());
 
-        match package(&loaded_modlets, modlet, padding + 1, &pb) {
+        match package(&mut loaded_modlets, modlet, padding + 1, &pb) {
             Ok(_) => {
                 if verbose {
                     pb.finish_with_message(style("OKAY").green().bold().to_string());

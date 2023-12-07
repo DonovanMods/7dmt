@@ -3,7 +3,7 @@ name = "dmt"
 description = "'7 Days Modding Tool' - A command line tool for managing 7 Days to Die Modlet builds"
 authors = ["Donovan C. Young"]
 edition = "2021"
-version = "0.2.0"
+version = "1.0.0"
 rust-version = "1.74"
 readme = "README.md"
 repository = "https://github.com/DonovanMods/7dmt"
@@ -30,6 +30,7 @@ resolver = "2"
 members = ["modinfo", "modlet"]
 
 [workspace.dependencies]
+convert_case = "0.6.0"
 dirs = "5"
 eyre = "0.6"
 glob = "0.3.1"
@@ -54,6 +55,7 @@ itertools = { workspace = true }
 lazy_static = { workspace = true }
 modinfo = { workspace = true }
 modlet = { workspace = true }
+quick-xml = { workspace = true }
 rayon = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
