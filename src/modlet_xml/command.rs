@@ -1,12 +1,12 @@
 use std::fmt::{Display, Formatter};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CsvInstruction {
     Add(char),
     Remove(char),
 }
 
-#[derive(Clone, Default, Debug, PartialEq)]
+#[derive(Debug, Clone, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct InstructionSet {
     pub attribute: Option<String>,
     pub csv_op: Option<CsvInstruction>,
@@ -28,7 +28,7 @@ pub const TEXT_COMMANDS: [&str; 3] = ["csv", "set", "set_attribute"];
 pub const EMPTY_COMMANDS: [&str; 2] = ["remove", "remove_attribute"];
 
 /// Represents a modlet command instruction
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum Command {
     Append(InstructionSet),
     Comment(String),

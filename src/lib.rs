@@ -11,7 +11,7 @@ mod modlet_xml;
 use modlet_xml::ModletXML;
 
 /// Represents a modlet
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Modlet {
     pub path: PathBuf,
     pub modinfo: Modinfo,
@@ -42,13 +42,16 @@ impl Modlet {
         Ok(Self { path, modinfo, xmls })
     }
 
+    pub fn files(&self) -> Vec<Cow<Path>> {
+        let mut files = Vec::new();
+        for xml in &self.xmls {
+            files.push(xml.filename());
+        }
+        files
+    }
+
     /// Returns the name of the modlet
     pub fn name(&self) -> Cow<str> {
-        self.path
-            .file_name()
-            .unwrap_or_default()
-            .to_str()
-            .unwrap_or_default()
-            .into()
+        self.path.file_name().unwrap_or_default().to_str().unwrap().into()
     }
 }

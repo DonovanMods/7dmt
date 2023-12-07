@@ -6,6 +6,7 @@ use quick_xml::{events::Event, reader::Reader};
 use std::{
     borrow::Cow,
     collections::VecDeque,
+    ffi::{OsStr, OsString},
     path::{Path, PathBuf},
     str::{self},
 };
@@ -13,7 +14,7 @@ use std::{
 mod command;
 use command::{Command, CsvInstruction, InstructionSet};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ModletXML {
     pub commands: Vec<Command>,
     pub path: PathBuf,
@@ -36,12 +37,19 @@ impl ModletXML {
         }
     }
 
-    pub fn filename(&self) -> Cow<str> {
+    pub fn filename(&self) -> Cow<Path> {
+        // self.path
+        //     .file_name()
+        //     .unwrap_or_default()
+        //     .to_str()
+        //     .unwrap_or_default()
+        //     .into()
+        // self.path.file_name().unwrap_or_default().to_str().unwrap().into()
         self.path
-            .file_name()
-            .unwrap_or_default()
-            .to_str()
-            .unwrap_or_default()
+            .iter()
+            .skip_while(|&ancestor| ancestor.to_ascii_lowercase() != "config")
+            .skip(1)
+            .collect::<PathBuf>()
             .into()
     }
 }
