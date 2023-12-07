@@ -1,11 +1,11 @@
+use glob::glob;
 use modinfo::Modinfo;
 use std::fmt;
 use std::{
     borrow::Cow,
+    io::Write,
     path::{Path, PathBuf},
 };
-// use eyre::eyre;
-use glob::glob;
 
 mod modlet_xml;
 use modlet_xml::ModletXML;
@@ -53,5 +53,11 @@ impl Modlet {
     /// Returns the name of the modlet
     pub fn name(&self) -> Cow<str> {
         self.path.file_name().unwrap_or_default().to_str().unwrap().into()
+    }
+
+    pub fn write(&self, writer: &mut quick_xml::Writer<impl Write>) -> eyre::Result<()> {
+        self.xmls.iter().try_for_each(|xml| xml.write(writer))?;
+
+        Ok(())
     }
 }

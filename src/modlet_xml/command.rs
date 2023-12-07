@@ -1,4 +1,8 @@
-use std::fmt::{Display, Formatter};
+use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
+use std::{
+    fmt::{Display, Formatter},
+    io::Write,
+};
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CsvInstruction {
@@ -115,5 +119,26 @@ impl Command {
             Command::StartTag(_) => Self::StartTag(None),
             Command::Unknown => Self::Unknown,
         }
+    }
+
+    pub fn write(&self, writer: &mut quick_xml::Writer<impl Write>) -> eyre::Result<()> {
+        match self {
+            Command::Append(_) => (),
+            Command::Comment(comment) => {
+                writer.write_event(Event::Comment(BytesText::new(comment)))?;
+            }
+            Command::Csv(_) => (),
+            Command::InsertAfter(_) => (),
+            Command::InsertBefore(_) => (),
+            Command::NoOp => (),
+            Command::Remove(_) => (),
+            Command::RemoveAttribute(_) => (),
+            Command::Set(_) => (),
+            Command::SetAttribute(_) => (),
+            Command::StartTag(_) => (),
+            Command::Unknown => (),
+        }
+
+        Ok(())
     }
 }

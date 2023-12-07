@@ -2,11 +2,14 @@
 /// The `ModletXML` struct represents an XML file containing modlet instructions.
 /// It provides methods for loading the XML file and extracting the commands from it.
 use eyre::eyre;
-use quick_xml::{events::Event, reader::Reader};
+use quick_xml::{
+    events::{BytesEnd, BytesStart, BytesText, Event},
+    reader::Reader,
+};
 use std::{
     borrow::Cow,
     collections::VecDeque,
-    ffi::{OsStr, OsString},
+    io::Write,
     path::{Path, PathBuf},
     str::{self},
 };
@@ -38,19 +41,18 @@ impl ModletXML {
     }
 
     pub fn filename(&self) -> Cow<Path> {
-        // self.path
-        //     .file_name()
-        //     .unwrap_or_default()
-        //     .to_str()
-        //     .unwrap_or_default()
-        //     .into()
-        // self.path.file_name().unwrap_or_default().to_str().unwrap().into()
         self.path
             .iter()
             .skip_while(|&ancestor| ancestor.to_ascii_lowercase() != "config")
             .skip(1)
             .collect::<PathBuf>()
             .into()
+    }
+
+    pub fn write(&self, writer: &mut quick_xml::Writer<impl Write>) -> eyre::Result<()> {
+        self.commands.iter().try_for_each(|command| command.write(writer))?;
+
+        Ok(())
     }
 }
 
@@ -72,7 +74,7 @@ fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
 
             // Found a comment
             Ok(Event::Comment(e)) => {
-                let comment = e.unescape().unwrap_or_default().trim().to_string();
+                let comment = e.unescape().unwrap_or_default().to_string();
 
                 if !comment.is_empty() {
                     commands.push(Command::Comment(comment));
