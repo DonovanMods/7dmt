@@ -55,8 +55,11 @@ impl Modlet {
         self.path.file_name().unwrap_or_default().to_str().unwrap().into()
     }
 
-    pub fn write(&self, writer: &mut quick_xml::Writer<impl Write>) -> eyre::Result<()> {
-        self.xmls.iter().try_for_each(|xml| xml.write(writer))?;
+    pub fn write(&self, writer: &mut quick_xml::Writer<impl Write>, filename: &Path) -> eyre::Result<()> {
+        self.xmls
+            .iter()
+            .filter(|xml| *xml.filename() == *filename)
+            .try_for_each(|xml| xml.write(writer))?;
 
         Ok(())
     }

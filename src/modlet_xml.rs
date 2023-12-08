@@ -2,10 +2,7 @@
 /// The `ModletXML` struct represents an XML file containing modlet instructions.
 /// It provides methods for loading the XML file and extracting the commands from it.
 use eyre::eyre;
-use quick_xml::{
-    events::{BytesEnd, BytesStart, BytesText, Event},
-    reader::Reader,
-};
+use quick_xml::{events::Event, reader::Reader};
 use std::{
     borrow::Cow,
     collections::VecDeque,
@@ -58,15 +55,18 @@ impl ModletXML {
 
 fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
     let mut commands = Vec::new();
-    let mut buf = Vec::new();
     let mut reader = Reader::from_file(path)?;
     let mut stack = VecDeque::<Command>::new();
     // The modlet we're building
     let mut instruction = InstructionSet::new();
     let mut start_tag = String::new();
+
+    // Set options on Reader
     reader.trim_text(true);
+    reader.trim_markup_names_in_closing_tags(true);
 
     loop {
+        let mut buf = Vec::new();
         let last_command = stack.get(0).unwrap_or(&Command::NoOp).as_ref();
 
         match reader.read_event_into(&mut buf) {
@@ -103,15 +103,14 @@ fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
                         continue;
                     }
 
-                    let delim: char = get_attribute(&e, "delim")
-                        .unwrap_or(String::from(","))
-                        .chars()
-                        .next()
-                        .unwrap();
+                    let my_char = str::from_utf8(get_attribute(&e, "delim").unwrap_or(vec![b',']).as_ref())
+                        .unwrap()
+                        .to_string();
+                    let delim: char = my_char.chars().next().unwrap();
 
-                    instruction.xpath = get_attribute(&e, "xpath");
+                    instruction.xpath = get_attribute(&e, "xpath").unwrap().clone();
                     instruction.csv_op = match get_attribute(&e, "op") {
-                        Some(op) => match op.as_str() {
+                        Some(op) => match str::from_utf8(&op).unwrap() {
                             "add" => Some(CsvInstruction::Add(delim)),
                             "remove" => Some(CsvInstruction::Remove(delim)),
                             _ => None,
@@ -183,11 +182,11 @@ fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
     Ok(commands)
 }
 
-fn get_attribute(e: &quick_xml::events::BytesStart, attr: &str) -> Option<String> {
+fn get_attribute(e: &quick_xml::events::BytesStart, attr: &str) -> Option<Vec<u8>> {
     for attribute in e.attributes() {
         let attribute = attribute.unwrap();
         if str::from_utf8(attribute.key.as_ref()) == Ok(attr) {
-            return Some(str::from_utf8(attribute.value.as_ref()).unwrap().to_owned());
+            return Some(attribute.unescape_value().unwrap_or_default().as_bytes().to_owned());
         }
     }
 

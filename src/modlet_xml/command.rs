@@ -1,4 +1,4 @@
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::events::{BytesText, Event};
 use std::{
     fmt::{Display, Formatter},
     io::Write,
@@ -15,7 +15,7 @@ pub struct InstructionSet {
     pub attribute: Option<String>,
     pub csv_op: Option<CsvInstruction>,
     pub values: Vec<String>,
-    pub xpath: Option<String>,
+    pub xpath: Vec<u8>,
 }
 
 impl InstructionSet {
@@ -130,13 +130,20 @@ impl Command {
             Command::Csv(_) => (),
             Command::InsertAfter(_) => (),
             Command::InsertBefore(_) => (),
-            Command::NoOp => (),
             Command::Remove(_) => (),
             Command::RemoveAttribute(_) => (),
-            Command::Set(_) => (),
+            Command::Set(is) => {
+                // Convert the xpath to bytes so quick-xml doesn't try to escape it
+                // let xpath = is.xpath.as_slice();
+
+                writer
+                    .create_element("set")
+                    .with_attribute((b"xpath".as_ref(), is.xpath.as_slice()))
+                    .write_text_content(BytesText::new(is.values.join(",").as_ref()))?;
+            }
             Command::SetAttribute(_) => (),
             Command::StartTag(_) => (),
-            Command::Unknown => (),
+            _ => (),
         }
 
         Ok(())
