@@ -11,7 +11,7 @@ mod modlet_xml;
 use modlet_xml::ModletXML;
 
 /// Represents a modlet
-#[derive(Debug, Clone, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Modlet {
     pub path: PathBuf,
     pub modinfo: Modinfo,

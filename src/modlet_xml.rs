@@ -14,7 +14,7 @@ use std::{
 mod command;
 use command::{Command, CsvInstruction, InstructionSet};
 
-#[derive(Debug, Clone, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ModletXML {
     pub commands: Vec<Command>,
     pub path: PathBuf,
@@ -60,30 +60,32 @@ fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
     // The modlet we're building
     let mut instruction = InstructionSet::new();
     let mut start_tag = String::new();
+    let mut buf = Vec::new();
 
     // Set options on Reader
     reader.trim_text(true);
     reader.trim_markup_names_in_closing_tags(true);
 
     loop {
-        let mut buf = Vec::new();
         let last_command = stack.get(0).unwrap_or(&Command::NoOp).as_ref();
 
         match reader.read_event_into(&mut buf) {
-            Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
+            Err(event) => panic!("Error at position {}: {:?}", reader.buffer_position(), event),
 
             // Found a comment
-            Ok(Event::Comment(e)) => {
-                let comment = e.unescape().unwrap_or_default().to_string();
+            Ok(Event::Comment(event)) => {
+                // let event = event.into_owned();
+                let comment = event.unescape().unwrap_or_default().to_string();
 
                 if !comment.is_empty() {
-                    commands.push(Command::Comment(comment));
+                    commands.push(Command::Comment(Cow::Owned(comment)));
                 }
             }
 
             // Found a start tag
-            Ok(Event::Start(e)) => {
-                let tag_name = e.name();
+            Ok(Event::Start(event)) => {
+                let event = event.into_owned();
+                let tag_name = event.name();
                 let tag_name = str::from_utf8(tag_name.as_ref())?;
                 let mut command = Command::from_str(tag_name);
 
@@ -93,8 +95,7 @@ fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
                 }
 
                 if command::COLLECTION_COMMANDS.contains(&last_command) {
-                    let tag_string = str::from_utf8(e.as_ref())?;
-                    instruction.values.push(tag_string.to_string());
+                    instruction.values.push(Event::Start(event));
                 } else if command.as_ref() != "unknown" && command.as_ref() != "no_op" {
                     // println!("[STARTING] tag {:?} ({command})", str::from_utf8(e.name().as_ref()).unwrap());
 
@@ -103,13 +104,13 @@ fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
                         continue;
                     }
 
-                    let my_char = str::from_utf8(get_attribute(&e, "delim").unwrap_or(vec![b',']).as_ref())
+                    let my_char = str::from_utf8(get_attribute(&event, "delim").unwrap_or(vec![b',']).as_ref())
                         .unwrap()
                         .to_string();
                     let delim: char = my_char.chars().next().unwrap();
 
-                    instruction.xpath = get_attribute(&e, "xpath").unwrap().clone();
-                    instruction.csv_op = match get_attribute(&e, "op") {
+                    instruction.xpath = get_attribute(&event, "xpath").unwrap();
+                    instruction.csv_op = match get_attribute(&event, "op") {
                         Some(op) => match str::from_utf8(&op).unwrap() {
                             "add" => Some(CsvInstruction::Add(delim)),
                             "remove" => Some(CsvInstruction::Remove(delim)),
@@ -122,41 +123,44 @@ fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
             }
 
             // This is an empty tag (likely remove or remove_attribute)
-            Ok(Event::Empty(e)) => {
-                let tag_name = e.name();
+            Ok(Event::Empty(event)) => {
+                let event = event.into_owned();
+                let tag_name = event.name();
                 let tag_name = str::from_utf8(tag_name.as_ref())?;
-                let value = str::from_utf8(e.as_ref())?;
+                let value = str::from_utf8(event.as_ref())?;
 
                 if command::EMPTY_COMMANDS.contains(&tag_name) || command::COLLECTION_COMMANDS.contains(&last_command) {
-                    instruction.values.push(value.to_string());
+                    instruction.values.push(Event::Empty(event));
                 } else {
                     panic!("Unhandled empty tag received: {value}");
                 }
             }
 
             // Found text between tags, add it to our struct's value.
-            Ok(Event::Text(e)) => {
-                let value = str::from_utf8(&e)?;
+            Ok(Event::Text(event)) => {
+                let event = event.into_owned();
+                let value = str::from_utf8(&event)?;
                 let value = value.to_string();
 
                 if command::TEXT_COMMANDS.contains(&last_command) {
-                    instruction.values.push(value);
+                    instruction.values.push(Event::Text(event));
                 } else {
                     panic!("Unhandled text tag received: {value}");
                 }
             }
 
             // Found an end tag
-            Ok(Event::End(e)) => {
-                let tag = str::from_utf8(e.as_ref())?;
+            Ok(Event::End(event)) => {
+                let event = event.into_owned();
+                let tag = str::from_utf8(event.as_ref())?;
                 let mut command = Command::from_str(tag);
 
                 if command.as_ref() == "unknown" && !start_tag.is_empty() {
-                    command = Command::StartTag(Some(start_tag.clone()));
+                    command = Command::StartTag(Some(start_tag.to_string()));
                 }
 
                 if command::COLLECTION_COMMANDS.contains(&last_command) && command.as_ref() != last_command {
-                    instruction.values.push(tag.to_string());
+                    instruction.values.push(Event::End(event));
                 } else {
                     // println!("[ENDING] tag {tag} ({command}) / {last_command}");
 
@@ -170,12 +174,11 @@ fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
             Ok(Event::Eof) => break,
 
             // Something unexpected happened. Panic and exit.
-            Ok(e) => {
-                panic!("[UNKNOWN] event: {:?}", e.as_ref());
+            Ok(event) => {
+                panic!("[UNKNOWN] event: {:?}", event.as_ref());
             }
         }
 
-        // if we don't keep a borrow elsewhere, we can clear the buffer to keep memory usage low
         buf.clear();
     }
 

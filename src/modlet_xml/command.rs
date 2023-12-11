@@ -1,26 +1,35 @@
-use quick_xml::events::{BytesText, Event};
+use quick_xml::events::{BytesStart, BytesText, Event};
 use std::{
+    borrow::Cow,
     fmt::{Display, Formatter},
     io::Write,
+    str::from_utf8,
 };
 
-#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CsvInstruction {
     Add(char),
     Remove(char),
 }
 
-#[derive(Debug, Clone, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct InstructionSet {
-    pub attribute: Option<String>,
+    pub attribute: Option<Vec<u8>>,
     pub csv_op: Option<CsvInstruction>,
-    pub values: Vec<String>,
+    pub values: Vec<Event<'static>>,
     pub xpath: Vec<u8>,
 }
 
 impl InstructionSet {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    fn values_to_strings(&self) -> Vec<String> {
+        self.values
+            .iter()
+            .map(|e| from_utf8(e.to_vec().as_slice()).unwrap_or_default().to_owned())
+            .collect()
     }
 }
 
@@ -32,10 +41,10 @@ pub const TEXT_COMMANDS: [&str; 3] = ["csv", "set", "set_attribute"];
 pub const EMPTY_COMMANDS: [&str; 2] = ["remove", "remove_attribute"];
 
 /// Represents a modlet command instruction
-#[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Command {
     Append(InstructionSet),
-    Comment(String),
+    Comment(Cow<'static, str>),
     Csv(InstructionSet),
     InsertAfter(InstructionSet),
     InsertBefore(InstructionSet),
@@ -87,27 +96,27 @@ impl Display for Command {
 }
 
 impl Command {
-    pub fn from_str(cmd: impl AsRef<[u8]>) -> Self {
-        match cmd.as_ref() {
-            b"append" => Command::Append(InstructionSet::new()),
-            b"comment" => Command::Comment(String::new()),
-            b"csv" => Command::Csv(InstructionSet::new()),
-            b"insert_after" => Command::InsertAfter(InstructionSet::new()),
-            b"insert_before" => Command::InsertBefore(InstructionSet::new()),
-            b"no_op" => Command::NoOp,
-            b"remove" => Command::Remove(InstructionSet::new()),
-            b"remove_attribute" => Command::RemoveAttribute(InstructionSet::new()),
-            b"set" => Command::Set(InstructionSet::new()),
-            b"set_attribute" => Command::SetAttribute(InstructionSet::new()),
-            b"start_tag" => Command::StartTag(None),
+    pub fn from_str(cmd: &str) -> Self {
+        match cmd {
+            "append" => Command::Append(InstructionSet::new()),
+            "comment" => Command::Comment(Cow::Owned(String::new())),
+            "csv" => Command::Csv(InstructionSet::new()),
+            "insert_after" => Command::InsertAfter(InstructionSet::new()),
+            "insert_before" => Command::InsertBefore(InstructionSet::new()),
+            "no_op" => Command::NoOp,
+            "remove" => Command::Remove(InstructionSet::new()),
+            "remove_attribute" => Command::RemoveAttribute(InstructionSet::new()),
+            "set" => Command::Set(InstructionSet::new()),
+            "set_attribute" => Command::SetAttribute(InstructionSet::new()),
+            "start_tag" => Command::StartTag(None),
             _ => Command::Unknown,
         }
     }
 
-    pub fn set(&mut self, instruction_set: InstructionSet) -> Self {
+    pub fn set(self, instruction_set: InstructionSet) -> Self {
         match self {
             Command::Append(_) => Self::Append(instruction_set),
-            Command::Comment(_) => Self::Comment(instruction_set.values.join("")),
+            Command::Comment(_) => Self::Comment(Cow::Owned(instruction_set.values_to_strings().join(","))),
             Command::Csv(_) => Self::Csv(instruction_set),
             Command::InsertAfter(_) => Self::InsertAfter(instruction_set),
             Command::InsertBefore(_) => Self::InsertBefore(instruction_set),
@@ -123,9 +132,21 @@ impl Command {
 
     pub fn write(&self, writer: &mut quick_xml::Writer<impl Write>) -> eyre::Result<()> {
         match self {
-            Command::Append(_) => (),
+            // TODO: This isn't working, values need to be parsed into XML structs
+            Command::Append(is) => {
+                writer
+                    .create_element("append")
+                    .with_attribute((b"xpath".as_ref(), is.xpath.as_slice()))
+                    .write_inner_content(move |writer| {
+                        for event in &is.values {
+                            writer.write_event(event)?;
+                        }
+                        Ok::<(), eyre::Error>(())
+                    })?;
+            }
             Command::Comment(comment) => {
-                writer.write_event(Event::Comment(BytesText::new(comment)))?;
+                let comment = BytesText::from_escaped(comment.clone());
+                writer.write_event(Event::Comment(comment))?
             }
             Command::Csv(_) => (),
             Command::InsertAfter(_) => (),
@@ -133,13 +154,10 @@ impl Command {
             Command::Remove(_) => (),
             Command::RemoveAttribute(_) => (),
             Command::Set(is) => {
-                // Convert the xpath to bytes so quick-xml doesn't try to escape it
-                // let xpath = is.xpath.as_slice();
-
                 writer
                     .create_element("set")
-                    .with_attribute((b"xpath".as_ref(), is.xpath.as_slice()))
-                    .write_text_content(BytesText::new(is.values.join(",").as_ref()))?;
+                    .with_attribute((b"xpath".as_ref(), is.xpath.as_ref()))
+                    .write_text_content(BytesText::new(is.values_to_strings().join(",").as_ref()))?;
             }
             Command::SetAttribute(_) => (),
             Command::StartTag(_) => (),
