@@ -154,6 +154,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "702fc72eb24e5a1e48ce58027a675bc24edd52096d5397d4aea7c6dd9eca0bd1"
 
 [[package]]
+name = "cli-7dmt"
+version = "1.0.0"
+dependencies = [
+ "clap",
+ "color-eyre",
+ "console",
+ "dialoguer",
+ "dirs",
+ "eyre",
+ "glob",
+ "indicatif",
+ "itertools",
+ "lazy_static",
+ "modinfo_7dtd",
+ "modlet_7dtd",
+ "quick-xml",
+ "rayon",
+ "serde",
+ "serde_yaml",
+ "thiserror",
+]
+
+[[package]]
 name = "color-eyre"
 version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -258,29 +281,6 @@ dependencies = [
  "option-ext",
  "redox_users",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "dmt"
-version = "1.0.0"
-dependencies = [
- "clap",
- "color-eyre",
- "console",
- "dialoguer",
- "dirs",
- "eyre",
- "glob",
- "indicatif",
- "itertools",
- "lazy_static",
- "modinfo_7dtd",
- "modlet_7dtd",
- "quick-xml",
- "rayon",
- "serde",
- "serde_yaml",
- "thiserror",
 ]
 
 [[package]]

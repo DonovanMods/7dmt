@@ -1,6 +1,6 @@
 [package]
-name = "dmt"
-description = "'7 Days Modding Tool' - A command line tool for managing 7 Days to Die Modlet builds"
+name = "cli-7dmt"
+description = "'7 Days Modding Tool' - A command line tool for managing 7 Days to Die Modlet builds (7dmt)"
 authors = ["Donovan C. Young"]
 edition = "2021"
 version = "1.0.0"
