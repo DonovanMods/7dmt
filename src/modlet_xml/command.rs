@@ -1,4 +1,5 @@
-use quick_xml::events::{BytesStart, BytesText, Event};
+use convert_case::{Case, Casing};
+use quick_xml::events::{BytesText, Event};
 use std::{
     borrow::Cow,
     fmt::{Display, Formatter},
@@ -6,10 +7,33 @@ use std::{
     str::from_utf8,
 };
 
+// Modlet types that require additional lines to be added after the Start event
+pub const COLLECTION_COMMANDS: [&str; 3] = ["append", "insertafter", "insertbefore"];
+// Modlet types that are empty tags
+pub const EMPTY_COMMANDS: [&str; 2] = ["remove", "removeattribute"];
+// Modlet types that require additional TEXT lines added
+pub const TEXT_COMMANDS: [&str; 3] = ["csv", "set", "setattribute"];
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum CsvInstruction {
     Add(char),
     Remove(char),
+}
+
+impl CsvInstruction {
+    pub fn delim(&self) -> &char {
+        match self {
+            CsvInstruction::Add(delim) => delim,
+            CsvInstruction::Remove(delim) => delim,
+        }
+    }
+
+    pub fn op(&self) -> &str {
+        match self {
+            CsvInstruction::Add(_) => "add",
+            CsvInstruction::Remove(_) => "remove",
+        }
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -31,14 +55,11 @@ impl InstructionSet {
             .map(|e| from_utf8(e.to_vec().as_slice()).unwrap_or_default().to_owned())
             .collect()
     }
-}
 
-// Modlet types that require additional lines to be added after the Start event
-pub const COLLECTION_COMMANDS: [&str; 3] = ["append", "insert_after", "insert_before"];
-// Modlet types that require additional TEXT lines added
-pub const TEXT_COMMANDS: [&str; 3] = ["csv", "set", "set_attribute"];
-// Modlet types that are empty tags
-pub const EMPTY_COMMANDS: [&str; 2] = ["remove", "remove_attribute"];
+    fn xpath_attribute(&self) -> (&[u8], &[u8]) {
+        (b"xpath".as_ref(), self.xpath.as_slice())
+    }
+}
 
 /// Represents a modlet command instruction
 #[derive(Debug, Clone, PartialEq)]
@@ -57,58 +78,21 @@ pub enum Command {
     Unknown,
 }
 
-impl AsRef<str> for Command {
-    fn as_ref(&self) -> &str {
-        match self {
-            Command::Append(_) => "append",
-            Command::Comment(_) => "comment",
-            Command::Csv(_) => "csv",
-            Command::InsertAfter(_) => "insert_after",
-            Command::InsertBefore(_) => "insert_before",
-            Command::NoOp => "no_op",
-            Command::Remove(_) => "remove",
-            Command::RemoveAttribute(_) => "remove_attribute",
-            Command::Set(_) => "set",
-            Command::SetAttribute(_) => "set_attribute",
-            Command::StartTag(_) => "start_tag",
-            Command::Unknown => "unknown",
-        }
-    }
-}
-
-impl Display for Command {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Command::Append(_) => write!(f, "append"),
-            Command::Comment(_) => write!(f, "comment"),
-            Command::Csv(_) => write!(f, "csv"),
-            Command::InsertAfter(_) => write!(f, "insert_after"),
-            Command::InsertBefore(_) => write!(f, "insert_before"),
-            Command::NoOp => write!(f, "no_op"),
-            Command::Remove(_) => write!(f, "remove"),
-            Command::RemoveAttribute(_) => write!(f, "remove_attribute"),
-            Command::Set(_) => write!(f, "set"),
-            Command::SetAttribute(_) => write!(f, "set_attribute"),
-            Command::StartTag(_) => write!(f, "start_tag"),
-            Command::Unknown => write!(f, "unknown"),
-        }
-    }
-}
-
 impl Command {
-    pub fn from_str(cmd: &str) -> Self {
-        match cmd {
+    pub fn from_str(input_str: &str) -> Self {
+        let match_string = input_str.to_case(Case::Flat);
+        match match_string.as_str() {
             "append" => Command::Append(InstructionSet::new()),
             "comment" => Command::Comment(Cow::Owned(String::new())),
             "csv" => Command::Csv(InstructionSet::new()),
-            "insert_after" => Command::InsertAfter(InstructionSet::new()),
-            "insert_before" => Command::InsertBefore(InstructionSet::new()),
-            "no_op" => Command::NoOp,
+            "insertafter" => Command::InsertAfter(InstructionSet::new()),
+            "insertbefore" => Command::InsertBefore(InstructionSet::new()),
+            "noop" => Command::NoOp,
             "remove" => Command::Remove(InstructionSet::new()),
-            "remove_attribute" => Command::RemoveAttribute(InstructionSet::new()),
+            "removeattribute" => Command::RemoveAttribute(InstructionSet::new()),
             "set" => Command::Set(InstructionSet::new()),
-            "set_attribute" => Command::SetAttribute(InstructionSet::new()),
-            "start_tag" => Command::StartTag(None),
+            "setattribute" => Command::SetAttribute(InstructionSet::new()),
+            "starttag" => Command::StartTag(None),
             _ => Command::Unknown,
         }
     }
@@ -132,11 +116,10 @@ impl Command {
 
     pub fn write(&self, writer: &mut quick_xml::Writer<impl Write>) -> eyre::Result<()> {
         match self {
-            // TODO: This isn't working, values need to be parsed into XML structs
-            Command::Append(is) => {
+            Command::Append(is) | Command::InsertAfter(is) | Command::InsertBefore(is) => {
                 writer
-                    .create_element("append")
-                    .with_attribute((b"xpath".as_ref(), is.xpath.as_slice()))
+                    .create_element(&self.to_string())
+                    .with_attribute(is.xpath_attribute())
                     .write_inner_content(move |writer| {
                         for event in &is.values {
                             writer.write_event(event)?;
@@ -148,22 +131,76 @@ impl Command {
                 let comment = BytesText::from_escaped(comment.clone());
                 writer.write_event(Event::Comment(comment))?
             }
-            Command::Csv(_) => (),
-            Command::InsertAfter(_) => (),
-            Command::InsertBefore(_) => (),
-            Command::Remove(_) => (),
-            Command::RemoveAttribute(_) => (),
-            Command::Set(is) => {
+            Command::Csv(is) => {
                 writer
-                    .create_element("set")
-                    .with_attribute((b"xpath".as_ref(), is.xpath.as_ref()))
+                    .create_element(&self.to_string())
+                    .with_attributes([
+                        is.xpath_attribute(),
+                        (
+                            b"delim".as_ref(),
+                            is.csv_op.as_ref().unwrap().delim().to_string().as_bytes(),
+                        ),
+                        (b"op".as_ref(), is.csv_op.as_ref().unwrap().op().as_bytes()),
+                    ])
                     .write_text_content(BytesText::new(is.values_to_strings().join(",").as_ref()))?;
             }
-            Command::SetAttribute(_) => (),
+            Command::Remove(is) | Command::RemoveAttribute(is) => {
+                writer
+                    .create_element(&self.to_string())
+                    .with_attribute(is.xpath_attribute())
+                    .write_empty()?;
+            }
+            Command::Set(is) => {
+                writer
+                    .create_element(&self.to_string())
+                    .with_attribute(is.xpath_attribute())
+                    .write_text_content(BytesText::new(is.values_to_strings().join(",").as_ref()))?;
+            }
+            Command::SetAttribute(_) => {
+                todo!("SetAttribute not yet implemented")
+            }
             Command::StartTag(_) => (),
             _ => (),
         }
 
         Ok(())
+    }
+}
+
+impl AsRef<str> for Command {
+    fn as_ref(&self) -> &str {
+        match self {
+            Command::Append(_) => "append",
+            Command::Comment(_) => "comment",
+            Command::Csv(_) => "csv",
+            Command::InsertAfter(_) => "insertafter",
+            Command::InsertBefore(_) => "insertbefore",
+            Command::NoOp => "noop",
+            Command::Remove(_) => "remove",
+            Command::RemoveAttribute(_) => "removeattribute",
+            Command::Set(_) => "set",
+            Command::SetAttribute(_) => "setattribute",
+            Command::StartTag(_) => "starttag",
+            Command::Unknown => "unknown",
+        }
+    }
+}
+
+impl Display for Command {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Command::Append(_) => write!(f, "append"),
+            Command::Comment(_) => write!(f, "comment"),
+            Command::Csv(_) => write!(f, "csv"),
+            Command::InsertAfter(_) => write!(f, "insertAfter"),
+            Command::InsertBefore(_) => write!(f, "insertBefore"),
+            Command::NoOp => write!(f, "no_op"),
+            Command::Remove(_) => write!(f, "remove"),
+            Command::RemoveAttribute(_) => write!(f, "removeAttribute"),
+            Command::Set(_) => write!(f, "set"),
+            Command::SetAttribute(_) => write!(f, "setAttribute"),
+            Command::StartTag(_) => write!(f, "start_tag"),
+            Command::Unknown => write!(f, "unknown"),
+        }
     }
 }

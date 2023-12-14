@@ -89,18 +89,18 @@ fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
                 let tag_name = str::from_utf8(tag_name.as_ref())?;
                 let mut command = Command::from_str(tag_name);
 
-                if start_tag.is_empty() && command.as_ref() == "unknown" && last_command == "no_op" {
+                if start_tag.is_empty() && command.as_ref() == "unknown" && last_command == "noop" {
                     start_tag = tag_name.to_string();
                     command = Command::StartTag(Some(tag_name.to_string()));
                 }
 
                 if command::COLLECTION_COMMANDS.contains(&last_command) {
                     instruction.values.push(Event::Start(event));
-                } else if command.as_ref() != "unknown" && command.as_ref() != "no_op" {
+                } else if command.as_ref() != "unknown" && command.as_ref() != "noop" {
                     // println!("[STARTING] tag {:?} ({command})", str::from_utf8(e.name().as_ref()).unwrap());
 
                     // We don't want to add the start_tag command to the stack
-                    if command.as_ref() == "start_tag" {
+                    if command.as_ref() == "starttag" {
                         continue;
                     }
 
@@ -152,8 +152,8 @@ fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
             // Found an end tag
             Ok(Event::End(event)) => {
                 let event = event.into_owned();
-                let tag = str::from_utf8(event.as_ref())?;
-                let mut command = Command::from_str(tag);
+                let tag_name = str::from_utf8(event.as_ref())?;
+                let mut command = Command::from_str(tag_name);
 
                 if command.as_ref() == "unknown" && !start_tag.is_empty() {
                     command = Command::StartTag(Some(start_tag.to_string()));

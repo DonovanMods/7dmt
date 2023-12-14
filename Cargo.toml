@@ -24,6 +24,7 @@ name = "modlet"
 crate-type = ["lib"]
 
 [dependencies]
+convert_case = { workspace = true }
 eyre = { workspace = true }
 glob = { workspace = true }
 modinfo = { workspace = true }
