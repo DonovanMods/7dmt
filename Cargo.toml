@@ -3,8 +3,8 @@ name = "dmt"
 description = "'7 Days Modding Tool' - A command line tool for managing 7 Days to Die Modlet builds"
 authors = ["Donovan C. Young"]
 edition = "2021"
-version = "0.1.0"
-rust-version = "1.73"
+version = "1.0.0"
+rust-version = "1.74"
 readme = "README.md"
 repository = "https://github.com/DonovanMods/7dmt"
 documentation = "https://docs.rs/7dmt"
@@ -22,10 +22,41 @@ exclude = [".trunk/*", "tests/*", "src/tests/*"]
 name = "7dmt"
 path = "src/main.rs"
 
+[lints.rust]
+unsafe_code = "forbid"
+
+[workspace]
+resolver = "2"
+members = ["modinfo", "modlet"]
+
+[workspace.dependencies]
+convert_case = "0.6.0"
+dirs = "5"
+eyre = "0.6"
+glob = "0.3.1"
+itertools = "0.12"
+lazy_static = "1"
+modinfo = { package = "modinfo_7dtd", path = "modinfo" }
+modlet = { package = "modlet_7dtd", path = "modlet" }
+rayon = "1"
+thiserror = "1"
+quick-xml = "0.31"
+
 [dependencies]
-anyhow = "1.0.75"
-clap = { version = "~4.4", features = ["derive", "env"] }
-console = "~0.15"
-dialoguer = "~0.11"
-modinfo_7dtd = "0.1.1"
-thiserror = "1.0.50"
+clap = { version = "4", features = ["derive", "env"] }
+color-eyre = { version = "0.6.2", default-features = false }
+console = "0.15"
+dialoguer = "0.11"
+dirs = { workspace = true }
+eyre = { workspace = true }
+glob = { workspace = true }
+indicatif = { version = "0.17", features = ["rayon"] }
+itertools = { workspace = true }
+lazy_static = { workspace = true }
+modinfo = { workspace = true }
+modlet = { workspace = true }
+quick-xml = { workspace = true }
+rayon = { workspace = true }
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+thiserror = { workspace = true }

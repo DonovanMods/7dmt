@@ -1,3 +1,4 @@
+use color_eyre::eyre::Result;
 use console::{style, Term};
 use dmt::cli;
 use std::process::exit;
@@ -11,12 +12,12 @@ pub struct CommandResult {
     verbose: u8,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<()> {
+    color_eyre::install()?;
+
     let stdout = Term::stdout();
     let stderr = Term::stderr();
-    let result = cli::run();
-
-    // dbg!(&result);
+    let result = cli::run()?;
 
     if result.errors.is_empty() {
         if result.verbose >= 1 {

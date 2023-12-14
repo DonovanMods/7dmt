@@ -1,19 +1,25 @@
 use super::commands;
+use crate::dmt::helpers::verify_modlet_paths;
 use crate::CommandResult;
 use clap::{Args, Parser, Subcommand};
-use std::{fmt, path::PathBuf};
+use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
+use std::{fmt, path::PathBuf, sync::RwLock};
 use thiserror::Error;
 
 #[derive(Debug, Parser)]
 #[command(about, author, version, long_about = None)]
 pub struct Cli {
-    #[arg(short, long, global = true, value_name = "FILE")]
     /// Specify a custom config file
+    #[arg(short, long, global = true, value_name = "FILE")]
     config: Option<PathBuf>,
 
-    #[arg(short, long, global = true, action = clap::ArgAction::Count)]
     /// Verbose mode (may be repeated for increased verbosity)
+    #[arg(short, long, global = true, action = clap::ArgAction::Count)]
     verbose: u8,
+
+    #[arg(short, long, global = true, value_name = "PATH")]
+    game_directory: Option<PathBuf>,
 
     #[command(subcommand)]
     command: Commands,
@@ -21,8 +27,8 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    #[command(arg_required_else_help = true)]
     /// Bump the version of a modlet
+    #[command(arg_required_else_help = true)]
     Bump {
         /// The modlet path to operate on
         paths: Vec<PathBuf>,
@@ -31,16 +37,8 @@ pub enum Commands {
         /// The version to set
         vers: Vers,
     },
-    /// Initialize a new modlet
-    Init {
-        /// The name of the modlet to create
-        name: String,
-
-        /// [Optionally] the ModInfo version to use (default: V2)
-        #[command(flatten)]
-        requested_version: Option<RequestedVersion>,
-    },
     /// Convert a ModInfo.xml from V1 to V2 (or vice versa)
+    #[command(arg_required_else_help = true)]
     Convert {
         /// The modlet path(s) to operate on
         paths: Vec<PathBuf>,
@@ -49,14 +47,37 @@ pub enum Commands {
         #[command(flatten)]
         requested_version: Option<RequestedVersion>,
     },
+    /// Initialize a new modlet
+    #[command(arg_required_else_help = true)]
+    Init {
+        /// The name of the modlet to create
+        name: String,
+
+        /// [Optionally] the ModInfo version to use (default: V2)
+        #[command(flatten)]
+        requested_version: Option<RequestedVersion>,
+    },
+    // Future: We'll process instructions in special `dmt` xml sections to create
+    // larger modlets -- ala lessgrind.
+    /// Package Modlet(s)
+    #[command(arg_required_else_help = true)]
+    Package {
+        /// The modlet to package into
+        #[arg(short, long, value_name = "PATH")]
+        output: PathBuf,
+
+        /// The modlet path(s) to operate on
+        modlets: Vec<PathBuf>,
+    },
 }
 
 impl fmt::Display for Commands {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Commands::Bump { .. } => write!(f, "Bump"),
-            Commands::Init { .. } => write!(f, "Init"),
             Commands::Convert { .. } => write!(f, "Convert"),
+            Commands::Init { .. } => write!(f, "Init"),
+            Commands::Package { .. } => write!(f, "Package"),
         }
     }
 }
@@ -92,22 +113,35 @@ pub struct RequestedVersion {
     pub v2: bool,
 }
 
-#[derive(Error, Debug)]
+#[derive(Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct Config {
+    #[serde(default)]
+    pub game_directory: Option<PathBuf>,
+    pub verbosity: u8,
+}
+
+lazy_static! {
+    pub static ref SETTINGS: RwLock<Config> = RwLock::new(Config::default());
+}
+
+#[derive(Debug, Error)]
 pub enum CliError {
-    #[error("No modlet path specified")]
-    NoModletPath,
     #[error("Invalid argument: {0}")]
     InvalidArg(String),
+    #[error("No game directory specified")]
+    NoGameDirectory,
+    #[error("No modlet path specified")]
+    NoModletPath,
     #[error("Unknown error: {0}")]
     Unknown(String),
 }
 
-pub fn run() -> CommandResult {
+pub fn run() -> eyre::Result<CommandResult> {
     let cli = Cli::parse();
-    let mut result = CommandResult {
-        verbose: cli.verbose,
-        ..Default::default()
-    };
+    let mut result = CommandResult::default();
+
+    SETTINGS.write().unwrap().game_directory = cli.game_directory;
+    SETTINGS.write().unwrap().verbosity = cli.verbose;
 
     match &cli.command {
         Commands::Bump { paths, vers } => {
@@ -140,6 +174,23 @@ pub fn run() -> CommandResult {
                 }
             }
         }
+        Commands::Convert {
+            paths,
+            requested_version,
+        } => {
+            if paths.is_empty() {
+                result.errors.push(CliError::NoModletPath);
+            } else {
+                for path in paths {
+                    match commands::convert::run(path, requested_version.as_ref()) {
+                        Ok(_) => result
+                            .messages
+                            .push(format!("Successfully converted {}", path.display())),
+                        Err(err) => result.errors.push(CliError::InvalidArg(err.to_string())),
+                    }
+                }
+            }
+        }
         Commands::Init {
             name,
             requested_version,
@@ -149,33 +200,26 @@ pub fn run() -> CommandResult {
                     .errors
                     .push(CliError::Unknown(String::from("No modlet name specified")));
             } else {
-                match commands::init::run(name.clone(), requested_version) {
+                match commands::init::run(name.clone(), requested_version.as_ref()) {
                     Ok(true) => result.messages.push(format!("Created Modlet {}", name)),
                     Ok(false) => result.messages.push("Cancelled".to_owned()),
                     Err(err) => result.errors.push(CliError::Unknown(err.to_string())),
                 }
             }
         }
-        Commands::Convert {
-            paths,
-            requested_version,
-        } => {
-            if paths.is_empty() {
+        Commands::Package { modlets, output } => {
+            if SETTINGS.read().unwrap().game_directory.is_none() {
+                result.errors.push(CliError::NoGameDirectory);
+            } else if modlets.is_empty() {
                 result.errors.push(CliError::NoModletPath);
             } else {
-                for path in paths {
-                    match commands::convert::run(path, requested_version) {
-                        Ok(_) => result
-                            .messages
-                            .push(format!("Successfully converted {}", path.display())),
-                        Err(err) => result.errors.push(CliError::InvalidArg(err.to_string())),
-                    }
-                }
+                let verified_paths = verify_modlet_paths(modlets)?;
+                commands::package::run(&verified_paths, output)?
             }
         }
     };
 
-    result
+    Ok(result)
 }
 
 mod tests {
