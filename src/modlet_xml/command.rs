@@ -156,8 +156,14 @@ impl Command {
                     .with_attribute(is.xpath_attribute())
                     .write_text_content(BytesText::new(is.values_to_strings().join(",").as_ref()))?;
             }
-            Command::SetAttribute(_) => {
-                todo!("SetAttribute not yet implemented")
+            Command::SetAttribute(is) => {
+                writer
+                    .create_element(&self.to_string())
+                    .with_attributes([
+                        is.xpath_attribute(),
+                        (b"name".as_ref(), is.attribute.as_ref().unwrap().to_vec().as_slice()),
+                    ])
+                    .write_text_content(BytesText::new(is.values_to_strings().join(",").as_ref()))?;
             }
             Command::StartTag(_) => (),
             _ => (),
