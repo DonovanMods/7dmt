@@ -2,7 +2,7 @@ use crate::dmt::{commands, SETTINGS};
 use color_eyre::eyre::{eyre, Result};
 use console::{style, Term};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use modlet::Modlet;
+use modlet::modlet::Modlet;
 use quick_xml::{
     events::{BytesEnd, BytesStart, BytesText, Event},
     Writer,

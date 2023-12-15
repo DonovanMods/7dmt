@@ -41,6 +41,7 @@ modlet = { package = "modlet_7dtd", path = "modlet" }
 rayon = "1"
 thiserror = "1"
 quick-xml = "0.31"
+rstest = "0.18"
 
 [dependencies]
 clap = { version = "4", features = ["derive", "env"] }
@@ -60,3 +61,6 @@ rayon = { workspace = true }
 serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
 thiserror = { workspace = true }
+
+[dev-dependencies]
+rstest = { workspace = true }
