@@ -87,7 +87,7 @@ fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
                 let event = event.into_owned();
                 let tag_name = event.name();
                 let tag_name = str::from_utf8(tag_name.as_ref())?;
-                let mut command = Command::from_str(tag_name);
+                let mut command = Command::parse(tag_name);
 
                 if start_tag.is_empty() && command.as_ref() == "unknown" && last_command == "noop" {
                     start_tag = tag_name.to_string();
@@ -145,7 +145,7 @@ fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
                 if command::TEXT_COMMANDS.contains(&last_command) {
                     instruction.values.push(Event::Text(event));
                 } else {
-                    panic!("Unhandled text tag received: {value}");
+                    panic!("Unhandled text tag received: {value} for {last_command}");
                 }
             }
 
@@ -153,7 +153,7 @@ fn load_xml(path: &Path) -> eyre::Result<Vec<Command>> {
             Ok(Event::End(event)) => {
                 let event = event.into_owned();
                 let tag_name = str::from_utf8(event.as_ref())?;
-                let mut command = Command::from_str(tag_name);
+                let mut command = Command::parse(tag_name);
 
                 if command.as_ref() == "unknown" && !start_tag.is_empty() {
                     command = Command::StartTag(Some(start_tag.to_string()));

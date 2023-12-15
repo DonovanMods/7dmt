@@ -4,7 +4,7 @@ use std::{
     borrow::Cow,
     fmt::{Display, Formatter},
     io::Write,
-    str::from_utf8,
+    str,
 };
 
 // Modlet types that require additional lines to be added after the Start event
@@ -36,7 +36,7 @@ impl CsvInstruction {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Default, Clone, Eq, PartialEq)]
 pub struct InstructionSet {
     pub attribute: Option<Vec<u8>>,
     pub csv_op: Option<CsvInstruction>,
@@ -52,7 +52,7 @@ impl InstructionSet {
     fn values_to_strings(&self) -> Vec<String> {
         self.values
             .iter()
-            .map(|e| from_utf8(e.to_vec().as_slice()).unwrap_or_default().to_owned())
+            .map(|e| str::from_utf8(e.to_vec().as_slice()).unwrap_or_default().to_owned())
             .collect()
     }
 
@@ -62,7 +62,7 @@ impl InstructionSet {
 }
 
 /// Represents a modlet command instruction
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Command {
     Append(InstructionSet),
     Comment(Cow<'static, str>),
@@ -75,11 +75,11 @@ pub enum Command {
     Set(InstructionSet),
     SetAttribute(InstructionSet),
     StartTag(Option<String>),
-    Unknown,
+    Unknown(Cow<'static, str>),
 }
 
 impl Command {
-    pub fn from_str(input_str: &str) -> Self {
+    pub fn parse(input_str: &str) -> Self {
         let match_string = input_str.to_case(Case::Flat);
         match match_string.as_str() {
             "append" => Command::Append(InstructionSet::new()),
@@ -93,7 +93,7 @@ impl Command {
             "set" => Command::Set(InstructionSet::new()),
             "setattribute" => Command::SetAttribute(InstructionSet::new()),
             "starttag" => Command::StartTag(None),
-            _ => Command::Unknown,
+            tag => Command::Unknown(Cow::Owned(tag.to_string())),
         }
     }
 
@@ -110,7 +110,7 @@ impl Command {
             Command::Set(_) => Self::Set(instruction_set),
             Command::SetAttribute(_) => Self::SetAttribute(instruction_set),
             Command::StartTag(_) => Self::StartTag(None),
-            Command::Unknown => Self::Unknown,
+            Command::Unknown(tag) => Self::Unknown(tag),
         }
     }
 
@@ -187,7 +187,7 @@ impl AsRef<str> for Command {
             Command::Set(_) => "set",
             Command::SetAttribute(_) => "setattribute",
             Command::StartTag(_) => "starttag",
-            Command::Unknown => "unknown",
+            Command::Unknown(_) => "unknown",
         }
     }
 }
@@ -206,7 +206,27 @@ impl Display for Command {
             Command::Set(_) => write!(f, "set"),
             Command::SetAttribute(_) => write!(f, "setAttribute"),
             Command::StartTag(_) => write!(f, "start_tag"),
-            Command::Unknown => write!(f, "unknown"),
+            Command::Unknown(tag) => write!(f, "{tag}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[fixture]
+    fn instruction_set() -> InstructionSet {
+        InstructionSet::new()
+    }
+
+    // mod fixtures;
+    #[rstest]
+    #[case::with_append("append", Command::Append(instruction_set()))]
+    #[case::with_comment("comment", Command::Comment(Cow::Owned(String::new())))]
+    #[case::with_csv("csv", Command::Csv(instruction_set()))]
+    #[case::with_unknown("foo", Command::Unknown(Cow::Owned("foo".to_string())))]
+    fn test_parse(#[case] input: &str, #[case] expected: Command) {
+        assert_eq!(expected, Command::parse(input));
     }
 }
