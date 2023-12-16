@@ -63,10 +63,11 @@ pub enum Commands {
     #[command(arg_required_else_help = true)]
     Package {
         /// The modlet to package into
-        #[arg(short, long, value_name = "PATH")]
+        #[arg(short, long, value_name = "MODLET")]
         output: PathBuf,
 
         /// The modlet path(s) to operate on
+        #[arg(value_name = "MODLET_PATHS", required = true)]
         modlets: Vec<PathBuf>,
     },
 }
@@ -128,8 +129,8 @@ lazy_static! {
 pub enum CliError {
     #[error("Invalid argument: {0}")]
     InvalidArg(String),
-    #[error("No game directory specified")]
-    NoGameDirectory,
+    // #[error("No game directory specified")]
+    // NoGameDirectory,
     #[error("No modlet path specified")]
     NoModletPath,
     #[error("Unknown error: {0}")]
@@ -208,9 +209,10 @@ pub fn run() -> eyre::Result<CommandResult> {
             }
         }
         Commands::Package { modlets, output } => {
-            if SETTINGS.read().unwrap().game_directory.is_none() {
-                result.errors.push(CliError::NoGameDirectory);
-            } else if modlets.is_empty() {
+            // if SETTINGS.read().unwrap().game_directory.is_none() {
+            //     result.errors.push(CliError::NoGameDirectory);
+            // }
+            if modlets.is_empty() {
                 result.errors.push(CliError::NoModletPath);
             } else {
                 let verified_paths = verify_modlet_paths(modlets)?;
