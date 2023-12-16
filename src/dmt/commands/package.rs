@@ -45,7 +45,7 @@ fn package(
 ) -> eyre::Result<()> {
     let verbose = SETTINGS.read().unwrap().verbosity > 0;
     let config_dir = output_modlet.join("Config");
-    let config_file = config_dir.join(&file);
+    let config_file = config_dir.join(file);
 
     if config_file.exists() {
         fs::remove_file(&config_file)?;

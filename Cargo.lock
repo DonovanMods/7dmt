@@ -169,7 +169,6 @@ dependencies = [
  "clap",
  "color-eyre",
  "console",
- "convert_case",
  "dialoguer",
  "dirs",
  "eyre",
