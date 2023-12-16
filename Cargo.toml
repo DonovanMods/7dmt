@@ -29,6 +29,7 @@ eyre = { workspace = true }
 glob = { workspace = true }
 modinfo = { workspace = true }
 quick-xml = { workspace = true }
+rayon.workspace = true
 
 [dev-dependencies]
 rstest = { workspace = true }

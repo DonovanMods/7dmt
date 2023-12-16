@@ -1,5 +1,6 @@
 use glob::glob;
 use modinfo::Modinfo;
+use rayon::prelude::*;
 use std::fmt;
 use std::{
     borrow::Cow,
@@ -32,7 +33,7 @@ impl Modlet {
         } else {
             Modinfo::new()
         };
-        let glob_pattern = path.join("config/**/*");
+        let glob_pattern = path.join("Config/**/*");
         for file in glob(glob_pattern.to_str().unwrap())? {
             let file = file?;
             if file.is_dir() {
@@ -91,7 +92,7 @@ impl Modlet {
     /// Write non-xml files
     pub fn write_files(&self, destination: &Path) -> eyre::Result<()> {
         if let Some(files) = self.files.as_ref() {
-            for file in files {
+            files.into_par_iter().try_for_each(|file| -> eyre::Result<()> {
                 let file = file.strip_prefix(&self.path).unwrap();
                 let src = self.path.join(file);
                 let dst = destination.join(file);
@@ -111,7 +112,9 @@ impl Modlet {
                         write!(writer, "{}\r\n", line)?; // We always write localization files with CRLF
                     }
                 }
-            }
+
+                Ok(())
+            })?;
         }
 
         Ok(())
